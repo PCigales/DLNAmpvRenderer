@@ -6,26 +6,26 @@ DLNAmpvRenderer is an application written in Python 3 designed as a wrapper for 
 
 To install the application:
 
-    of course, install Python 3
-    copy DLNAmpvRenderer.py, icon.png and mpv.bat in the same folder
-    install mpv (https://mpv.io/installation/)
-    open mpv.bat and, if needed, change the path of mpv executable (more customization can be made later on)
-    allow mpv and python to communicate through the firewall (for more precise needs, see below)
+- of course, install Python 3
+- copy DLNAmpvRenderer.py, icon.png and mpv.bat in the same folder
+- install mpv (https://mpv.io/installation/)
+- open mpv.bat and, if needed, change the path of mpv executable (more customization can be made later on)
+- allow mpv and python to communicate through the firewall (for more precise needs, see below)
 
 To run the application:
 
-    DLNAmpvRenderer -h to display the complete syntax of command line and abbreviated commands
+ DLNAmpvRenderer -h to display the complete syntax of command line and abbreviated commands
     
-    DLNAmpvRenderer [-h] [--port RENDERER_TCP_PORT] [--minimize] [--fullscreen] [--wmpdmc_no_mkv] [--trust_controler] [--verbosity VERBOSE]
+ DLNAmpvRenderer [-h] [--port RENDERER_TCP_PORT] [--minimize] [--fullscreen] [--wmpdmc_no_mkv] [--trust_controler] [--verbosity VERBOSE]
     
-    -- port RENDERER_TCP_PORT: the port used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests
-    -- minimize: when set, minimizes the window of mpv when inactive and restore it to its previous size when a playback is launched (useful when displaying photos as some controlers stop the playback between two consecutive pictures or when playing music as there is no use showing the window)
-    -- fullscreen: when set, makes mpv go fullscreen each time a playback starts (can be combined with 'minimize')
-    -- wmpdmc_no_mkv: when set, Windows Media Player Digital Media Controller will transcode 'mkv' (matroska) files to 'mpegts' before streaming the content, allowing remote control of the playback, otherwise, the 'mkv' file will be streamed as it is, and the seekbar will probably be inactive in WMPDMC (but available in mpv)
-    -- trust_controler: when set, the URL of the content sent to the renderer is not checked before being passed to mpv (useful to play local content by sending the path to the file, if the controler allows it, which is the case of DLNAPlayOn)
-    -- verbosity VERBOSE: for troubleshooting purposes, from 0 (default) to 2
+  -- port RENDERER_TCP_PORT: the port used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests
+  -- minimize: when set, minimizes the window of mpv when inactive and restore it to its previous size when a playback is launched (useful when displaying photos as some controlers stop the playback between two consecutive pictures or when playing music as there is no use showing the window)
+  -- fullscreen: when set, makes mpv go fullscreen each time a playback starts (can be combined with 'minimize')
+  -- wmpdmc_no_mkv: when set, Windows Media Player Digital Media Controller will transcode 'mkv' (matroska) files to 'mpegts' before streaming the content, allowing remote control of the playback, otherwise, the 'mkv' file will be streamed as it is, and the seekbar will probably be inactive in WMPDMC (but available in mpv)
+  -- trust_controler: when set, the URL of the content sent to the renderer is not checked before being passed to mpv (useful to play local content by sending the path to the file, if the controler allows it, which is the case of DLNAPlayOn)
+  -- verbosity VERBOSE: for troubleshooting purposes, from 0 (default) to 2
 
-    Exemple: DLNAmpvRenderer -p 9100 -m -f -t
+ Example: DLNAmpvRenderer -p 9100 -m -f -t
 
 As for the settings of the firewall, mpv needs outgoing TCP connections allowed, and python outgoing TCP and UDP connections, as well as incoming TCP connections from local network on local port RENDERER_TCP_PORT (as in command line), incoming UDP connections from local network on local port 1900.
 
