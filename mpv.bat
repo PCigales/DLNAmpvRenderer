@@ -1,0 +1,1 @@
+@"C:\Program Files\Mpv\mpv.exe" --input-ipc-server=\\.\pipe\mpv --pause --idle=yes --image-display-duration=inf --autofit=50%%
