@@ -59,13 +59,13 @@ def _jpeg_exif_orientation(uri):
       f = _open_url(uri, 'GET')
     else:
       f = open(uri, 'rb')
-    t = f.read(2)
-    if t != b'\xff\xd8':
+    if f.read(2) != b'\xff\xd8':
       f.close()
       return
     t = f.read(2)
     if t == b'\xff\xe0':
-      f.read(16)
+      len = struct.unpack('!H', f.read(2))[0]
+      f.read(len - 2)
       t = f.read(2)
     if t != b'\xff\xe1':
       f.close()
@@ -1570,26 +1570,6 @@ class DLNARenderer:
         </argument>
       </argumentList>
     </action>
-    <action>
-      <name>X_GetStoppedReason</name>
-      <argumentList>
-        <argument>
-          <name>InstanceID</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>StoppedReason</name>
-          <direction>out</direction>
-          <relatedStateVariable>A_ARG_TYPE_StoppedReason</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>StoppedReasonData</name>
-          <direction>out</direction>
-          <relatedStateVariable>A_ARG_TYPE_StoppedReasonData</relatedStateVariable>
-        </argument>
-      </argumentList>
-    </action>
   </actionList>
   <serviceStateTable>
     <stateVariable sendEvents="no">
@@ -1743,14 +1723,6 @@ class DLNARenderer:
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_SeekTarget</name>
-      <dataType>string</dataType>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_StoppedReason</name>
-      <dataType>string</dataType>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_StoppedReasonData</name>
       <dataType>string</dataType>
     </stateVariable>
   </serviceStateTable>
