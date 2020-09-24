@@ -355,11 +355,12 @@ class IPCmpvControler(threading.Thread):
             self.Player_event_event.set()
             self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportState', "TRANSITIONING"), 2)
           elif msg_dict['event'] == "end-file":
-            self.Player_status = "STOPPED"
             if msg_dict.get('reason','').lower() == "error":
               self.Player_events.append(('TransportStatus', "ERROR_OCCURRED"))
               self.Player_event_event.set()
               self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportStatus', "ERROR_OCCURRED"), 2)
+          elif msg_dict['event'] == "idle":
+            self.Player_status = "STOPPED"
             self.Player_events.append(('TransportState', "STOPPED"))
             self.Player_time_pos = ""
             self.Player_event_event.set()
