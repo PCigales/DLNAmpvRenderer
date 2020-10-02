@@ -418,8 +418,9 @@ class IPCmpvControler(threading.Thread):
     w = 0
     msg_chunk = ""
     while self.Cmd_buffer[0] == "run":
-      if not self.Write_pending and len(self.Cmd_buffer) > 1:
+      if len(self.Cmd_buffer) > 1:
         kernel32.ResetEvent(self.Cmd_Event)
+      if not self.Write_pending and len(self.Cmd_buffer) > 1:
         cmd = self.Cmd_buffer.pop(1)
         msg = None
         try:
