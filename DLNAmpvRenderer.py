@@ -20,6 +20,8 @@ import json
 import html
 import argparse
 
+
+NAME = 'DLNAmpvRenderer'                        
 UDN = 'uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, 'DLNAmpvRenderer'))
 
 
@@ -256,16 +258,17 @@ class IPCmpvControler(threading.Thread):
   def __init__(self, title_name = 'mpv', verbosity=0):
     self.verbosity = verbosity
     self.logger = log_event(verbosity)
+    self.title_name = title_name
     threading.Thread.__init__(self)
     self.lpOverlapped_r = pointer(OVERLAPPED())
     self.lpOverlapped_w = pointer(OVERLAPPED())
-    self.lpOverlapped_r.contents.hEvent=HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR('read')))
-    self.lpOverlapped_w.contents.hEvent=HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR('write')))
+    self.lpOverlapped_r.contents.hEvent=HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR(urllib.parse.quote(self.title_name, safe='') + '_read')))
+    self.lpOverlapped_w.contents.hEvent=HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR(urllib.parse.quote(self.title_name, safe='') + '_write')))
     self.NumberOfBytesTransferred_r = DWORD()
     self.NumberOfBytesTransferred_w = DWORD()
     self.Pipe_handle = None
     self.Pipe_buffer = ctypes.create_string_buffer(10000)
-    self.Cmd_Event = HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR('input')))
+    self.Cmd_Event = HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR(urllib.parse.quote(self.title_name, safe='') + '_input')))
     self.Msg_event = threading.Event()
     self.Cmd_buffer = ["run", ('set_property', 'script-opts', 'osc-visibility=never'), ('observe_property', 1, 'time-pos'), ('observe_property', 2, 'pause'), ('observe_property', 3, 'duration'), ('observe_property', 4, 'mute'), ('observe_property', 5, 'volume'), ('set_property', 'title', '${?media-title:${media-title}}${!media-title:No file} - %s' % title_name)]
     self.Msg_buffer = ["run"]
@@ -387,7 +390,7 @@ class IPCmpvControler(threading.Thread):
   def run_mpv(self):
     self.logger.log('Lecteur - lancement', 1)
     try:
-      process_result = subprocess.run(r'"%s\%s"' % (IPCmpvControler.SCRIPT_PATH, 'mpv.bat'), env=os.environ, capture_output=False)
+      process_result = subprocess.run(r'"%s\%s"' % (IPCmpvControler.SCRIPT_PATH, 'mpv.bat'), env={**os.environ, 'renderer_name': urllib.parse.quote(self.title_name, safe='')}, capture_output=False)
     except:
       pass
     self.logger.log('Lecteur: fermeture', 1)
@@ -405,7 +408,7 @@ class IPCmpvControler(threading.Thread):
     self.mpv_thread.start()
     request_id = 0
     while self.Cmd_buffer[0] != "quit":
-      self.Pipe_handle = HANDLE(kernel32.CreateFileW(LPWSTR(r'\\.\pipe\mpv'), DWORD(0xc0000000), DWORD(0), PVOID(0), DWORD(4), DWORD(0x60000000), HANDLE(0)))
+      self.Pipe_handle = HANDLE(kernel32.CreateFileW(LPWSTR(r'\\.\pipe\mpv_%s' % urllib.parse.quote(self.title_name, safe='')), DWORD(0xc0000000), DWORD(0), PVOID(0), DWORD(4), DWORD(0x60000000), HANDLE(0)))
       if kernel32.GetLastError() == 2:
         time.sleep(0.5)
       else:
@@ -418,8 +421,7 @@ class IPCmpvControler(threading.Thread):
     w = 0
     msg_chunk = ""
     while self.Cmd_buffer[0] == "run":
-      if len(self.Cmd_buffer) > 1:
-        kernel32.ResetEvent(self.Cmd_Event)
+      kernel32.ResetEvent(self.Cmd_Event)
       if not self.Write_pending and len(self.Cmd_buffer) > 1:
         cmd = self.Cmd_buffer.pop(1)
         msg = None
@@ -584,7 +586,7 @@ class DLNARequestHandler(socketserver.StreamRequestHandler):
     try:
       super().__init__(*args, **kwargs)
     except:
-      raise
+      pass
   
   def handle(self):
     if not self.Renderer.is_request_manager_running:
@@ -1070,7 +1072,7 @@ class DLNARenderer:
   <pnpx:X_deviceCategory>MediaDevices</pnpx:X_deviceCategory>
   <df:X_deviceCategory>Multimedia.DMR</df:X_deviceCategory>  
   <dlna:X_DLNADOC xmlns:dlna=\'urn:schemas-dlna-org:device-1-0\'>DMR-1.50</dlna:X_DLNADOC>
-  <friendlyName>DLNAmpvRenderer</friendlyName>
+  <friendlyName>''' + html.escape(NAME) + '''</friendlyName>
   <manufacturer>PCigales</manufacturer>
   <manufacturerURL>https://github.com/PCigales</manufacturerURL>
   <modelDescription>DLNA mpv renderer</modelDescription>
@@ -2165,7 +2167,7 @@ class DLNARenderer:
     self.JpegRotate = JpegRotate
     self.WMPDMCHideMKV = WMPDMCHideMKV
     self.TrustControler = TrustControler
-    self.IPCmpvControlerInstance = IPCmpvControler(title_name='DLNAmpvRenderer:%s' % RendererPort , verbosity=verbosity)
+    self.IPCmpvControlerInstance = IPCmpvControler(title_name=NAME + ':%s' % RendererPort , verbosity=verbosity)
     self.is_search_manager_running = None
     self.is_request_manager_running = None
     self.is_events_manager_running = None
@@ -2476,11 +2478,13 @@ class DLNARenderer:
         uri = in_args['CurrentURI'.lower()]
         protocol_info = s_protocol_info
       rep = None
+      server = ''
       if uri:
         if self.TrustControler:
           rep = True
         else:
           rep = _open_url(uri, 'HEAD')
+          server = rep.getheader('Server')
       if not rep:
         self.events_add('AVTransport', (('TransportStatus', "ERROR_OCCURRED"),))
         self.events_add('AVTransport', (('TransportStatus', "OK"),))
@@ -2500,7 +2504,7 @@ class DLNARenderer:
         rep = _open_url(self.AVTransportSubURI, 'HEAD')
         if not rep:
           self.AVTransportSubURI = ""
-      if 'object.item.videoItem'.lower() in upnp_class.lower() and not self.AVTransportSubURI and not 'MDEServer'.lower() in uri.lower() and not "BubbleUPnP".lower() in agent.lower() and not self.TrustControler:
+      if not self.TrustControler and 'object.item.videoItem'.lower() in upnp_class.lower() and not self.AVTransportSubURI and not 'Microsoft-HTTPAPI'.lower() in server.lower() and not "BubbleUPnP".lower() in server.lower():
         uri_name = uri.rsplit('.', 1)[0]
         for sub_ext in ('.ttxt', '.txt', '.smi', '.srt', '.sub', '.ssa', '.ass'):
           rep = _open_url(uri_name + sub_ext, 'HEAD', 2)
@@ -2524,7 +2528,7 @@ class DLNARenderer:
       else:
         self.send_command(('set_property', 'stream-lavf-o', {}))
       self.send_command(('set_property', 'force-media-title', title if title else ''))
-      if prev_transp_state in ("NO_MEDIA_PRESENT", "STOPPED", "TRANSITIONING"):
+      if self.IPCmpvControlerInstance.Player_status.upper() in ("NO_MEDIA_PRESENT", "STOPPED") and prev_transp_state in ("NO_MEDIA_PRESENT", "STOPPED"):
         self.TransportState = "STOPPED"
         self.RelativeTimePosition = "0:00:00"
         self.CurrentMediaDuration = "0:00:00"
@@ -2652,6 +2656,7 @@ if __name__ == '__main__':
   CustomArgumentParser = partial(argparse.ArgumentParser, formatter_class=formatter)
   parser = CustomArgumentParser()
   parser.add_argument('--port', '-p', metavar='RENDERER_TCP_PORT', help='port TCP du renderer [8000 par défaut]', type=int, default=8000)
+  parser.add_argument('--name', '-n', metavar='RENDERER_NAME', help='nom du renderer [DLNAmpvRenderer par défaut]', default='DLNAmpvRenderer')
   parser.add_argument('--minimize', '-m', help='passage en mode minimisé quand inactif [désactivé par défaut]', action='store_true')
   parser.add_argument('--fullscreen', '-f', help='passage en mode plein écran à chaque session [désactivé par défaut]', action='store_true')
   parser.add_argument('--rotate_jpeg', '-r', help='rotation automatique des images jpeg [désactivé par défaut]', action='store_true')
@@ -2660,6 +2665,10 @@ if __name__ == '__main__':
   parser.add_argument('--verbosity', '-v', metavar='VERBOSE', help='niveau de verbosité de 0 à 2 [0 par défaut]', type=int, choices=[0, 1, 2], default=0)
 
   args = parser.parse_args()
+  if args.name.strip() and args.name != 'DLNAmpvRenderer':
+    NAME = args.name
+    UDN = 'uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, args.name))
+    DLNARenderer.Device_SCPD = DLNARenderer.Device_SCPD.replace('DLNAmpvRenderer', html.escape(NAME)).replace('uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, 'DLNAmpvRenderer')), UDN)
   Renderer = DLNARenderer(args.port, args.minimize, args.fullscreen, args.rotate_jpeg, args.wmpdmc_no_mkv, args.trust_controler, args.verbosity)
   print('Appuyez sur "S" ou fermez mpv pour stopper')
   print('Appuyez sur "M" pour activer/désactiver le passage en mode minimisé quand inactif - mode actuel: %s' % ('activé' if Renderer.Minimize else 'désactivé'))
