@@ -8,7 +8,7 @@ import contextlib
 from functools import partial
 import socket
 import socketserver
-import urllib.parse, urllib.request
+import urllib.parse, urllib.request, urllib.error
 import struct
 import email.utils
 from xml.dom import minidom
@@ -37,12 +37,24 @@ class log_event:
       print(s_now, ':', msg)
 
 
-def _open_url(url, method=None, timeout=None):
+def _open_url(url, method=None, timeout=None, test_range=False):
   header = {'User-Agent': 'Lavf'}
+  if method and test_range:
+    if method.upper() == 'HEAD':
+      header['Range'] = 'bytes=0-'
   req = urllib.request.Request(url, headers=header, method=method)
   rep = None
   try:
     rep = urllib.request.urlopen(req, data=None, timeout=timeout)
+  except urllib.error.HTTPError as e:
+    if e.code == 406 and test_range and (method or '').upper() == 'HEAD':
+      del header['Range']
+      req = urllib.request.Request(url, headers=header, method=method)
+      rep = None
+      try:
+        rep = urllib.request.urlopen(req, data=None, timeout=timeout)
+      except:
+        pass
   except:
     pass
   return rep
@@ -58,7 +70,7 @@ def _jpeg_exif_orientation(uri):
   f = None
   try:
     if r'://' in uri:
-      f = _open_url(uri, 'GET')
+      f = _open_url(uri, method='GET')
     else:
       f = open(uri, 'rb')
     if f.read(2) != b'\xff\xd8':
@@ -2479,12 +2491,22 @@ class DLNARenderer:
         protocol_info = s_protocol_info
       rep = None
       server = ''
+      accept_range = True
       if uri:
         if self.TrustControler:
           rep = True
         else:
-          rep = _open_url(uri, 'HEAD')
-          server = rep.getheader('Server')
+          rep = _open_url(uri, method='HEAD', test_range=True)
+          server = rep.getheader('Server') or ''
+          if rep.getheader('Accept-Ranges'):
+            if rep.getheader('Accept-Ranges').lower() != 'none':
+              accept_range = True
+            else:
+              saccept_range = False
+          elif rep.status == 206:
+            accept_range = True
+          else:
+            accept_range = False
       if not rep:
         self.events_add('AVTransport', (('TransportStatus', "ERROR_OCCURRED"),))
         self.events_add('AVTransport', (('TransportStatus', "OK"),))
@@ -2501,13 +2523,13 @@ class DLNARenderer:
         rep.close()
       rep = None
       if self.AVTransportSubURI and not self.TrustControler:
-        rep = _open_url(self.AVTransportSubURI, 'HEAD')
+        rep = _open_url(self.AVTransportSubURI, method='HEAD')
         if not rep:
           self.AVTransportSubURI = ""
       if not self.TrustControler and 'object.item.videoItem'.lower() in upnp_class.lower() and not self.AVTransportSubURI and not 'Microsoft-HTTPAPI'.lower() in server.lower() and not "BubbleUPnP".lower() in server.lower():
         uri_name = uri.rsplit('.', 1)[0]
         for sub_ext in ('.ttxt', '.txt', '.smi', '.srt', '.sub', '.ssa', '.ass'):
-          rep = _open_url(uri_name + sub_ext, 'HEAD', 2)
+          rep = _open_url(uri_name + sub_ext, method='HEAD', timeout=2)
           if rep:
             self.AVTransportSubURI = uri_name + sub_ext
             caption_type = sub_ext
@@ -2526,7 +2548,7 @@ class DLNARenderer:
         else:
           self.send_command(('set_property', 'stream-lavf-o', {"seekable":"0"}))
       else:
-        self.send_command(('set_property', 'stream-lavf-o', {}))
+        self.send_command(('set_property', 'stream-lavf-o', {} if accept_range else {"seekable":"0"}))
       self.send_command(('set_property', 'force-media-title', title if title else ''))
       if self.IPCmpvControlerInstance.Player_status.upper() in ("NO_MEDIA_PRESENT", "STOPPED") and prev_transp_state in ("NO_MEDIA_PRESENT", "STOPPED"):
         self.TransportState = "STOPPED"
