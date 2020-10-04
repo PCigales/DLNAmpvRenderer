@@ -2,7 +2,7 @@
 
 A script in Python 3 to turn mpv into a DLNA/UPnP renderer
 
-DLNAmpvRenderer is an application written in Python 3 designed as a wrapper for mpv to use the player as a DLNA/UPnP renderer, on a computer running under Windows. The script does not need any other package, only the presence of an executable of mpv is required. The application has been tested with a few DLNA controlers (Windows Media Player Digital Media Controller, Bubble UPnP, UPnPlay, DLNAPlayOn) but should work with any DLNA compliant controler. Subtitles management is enabled through the DIDL description ('subtitlefileuri' or 'captioninfo'/'captioninfoex' tags) or the use of a 'captioninfo.sec' header in the response to the HEAD/GET request for the content to be played.
+DLNAmpvRenderer is an application written in Python 3 designed as a wrapper for mpv to use the player as a DLNA/UPnP renderer, on a computer running under Windows. The script does not need any other package, only the presence of an executable of mpv is required. The application has been tested with a few DLNA controlers (Windows Media Player Digital Media Controller, Bubble UPnP, UPnPlay, DLNAPlayOn) but should work with any DLNA compliant controler. Subtitles management is enabled through the DIDL description ('subtitlefileuri' or 'captioninfo'/'captioninfoex' tags) or the use of a 'captioninfo.sec' header in the response to the HEAD/GET request for the content to be played. Several instances can run in parallel provided they use different ports and names.
 
 To install the application:
 
@@ -16,9 +16,10 @@ To run the application:
 
  DLNAmpvRenderer -h to display the complete syntax of command line and abbreviated commands
     
- DLNAmpvRenderer [-h] [--port RENDERER_TCP_PORT] [--minimize] [--fullscreen] [--wmpdmc_no_mkv] [--trust_controler] [--verbosity VERBOSE]  
+ DLNAmpvRenderer [-h] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--wmpdmc_no_mkv] [--trust_controler] [--verbosity VERBOSE]  
     
   --port RENDERER_TCP_PORT: the port used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests    
+  --name RENDERER_NAME: the name of the renderer, used to generate the uuid    
   --minimize: when set, minimizes the window of mpv when inactive and restore it to its previous size when a playback is launched (useful when displaying photos as some controlers stop the playback between two consecutive pictures or when playing music as there is no use showing the window)    
   --fullscreen: when set, makes mpv go fullscreen each time a playback starts (can be combined with 'minimize')    
   --rotate_jpeg: when set, tries to read the orientation metadata of jpeg pictures, and send an accordingly rotation command to mpv, to make up for the inability of the player (due to ffmpeg) to do so by itself (the day when ffmpeg manages EXIF orientation for pictures, it will no longer be needed)
