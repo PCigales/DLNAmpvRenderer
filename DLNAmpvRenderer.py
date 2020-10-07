@@ -119,7 +119,7 @@ def _jpeg_exif_orientation(uri):
 
 class HTTPMessage():
 
-  def __init__(self, request, timeout=5, max_length=1048576):
+  def __init__(self, message, body=True, decode='utf-8', timeout=5, max_length=1048576):
     iter = 0
     while iter < 2:
       self.method = None
@@ -130,13 +130,18 @@ class HTTPMessage():
       self.headers = {}
       self.body = None
       if iter == 0:
-        if self._read_request(request, timeout, max_length):
+        if self._read_message(message, body, timeout, max_length):
           iter = 2
         else:
           iter = 1
       else:
         iter = 2
-    
+    if self.body != None and decode:
+      self.body = self.body.decode(decode)
+
+  def header(self, name, default = None):
+    return self.headers.get(name.upper(), default)
+
   def _read_headers(self, msg):
     if not msg:
       return
@@ -168,66 +173,125 @@ class HTTPMessage():
       self.method = a.upper()
       self.path = b
       self.version = c.upper()
-    if not 'Content-Length'.upper() in self.headers:
+    if not 'Content-Length'.upper() in self.headers and self.header('Transfer-Encoding', '').lower() != 'chunked':
       self.headers['Content-Length'.upper()] = 0
     return True
 
-  def header(self, name, default = None):
-    return self.headers.get(name.upper(), default)
-
-  def _read_request(self, request, timeout=5, max_length=1048576):
-    if not isinstance(request, socket.socket):
-      resp = request[0]
+  def _read_message(self, message, body, timeout=5, max_length=1048576):
+    rem_length = max_length
+    if not isinstance(message, socket.socket):
+      resp = message[0]
+    else:
+      message.settimeout(timeout)
+      resp = b''
+    while True:
+      resp = resp.lstrip(b'\r\n')
       body_pos = resp.find(b'\r\n\r\n')
       if body_pos >= 0:
         body_pos += 4
-      else:
-        body_pos = resp.find(b'\n\n')
-        if body_pos >= 0:
-          body_pos += 2
-    else:
-      request.settimeout(timeout)
-      resp = b''
-      while len(resp) < max_length:
-        bloc = None
-        try:
-          bloc = request.recv(max_length - len(resp))
-        except:
-          return None
-        if not bloc:
-          return None
-        resp = resp + bloc
-        body_pos = resp.find(b'\r\n\r\n')
-        if body_pos >= 0:
-          body_pos += 4
-          break
-        else:
-          body_pos = resp.find(b'\n\n')
-          if body_pos >= 0:
-            body_pos += 2
-            break
-    if body_pos < 0:
-      return None
+        break
+      body_pos = resp.find(b'\n\n')
+      if body_pos >= 0:
+        body_pos += 2
+        break
+      if not isinstance(message, socket.socket) or rem_length <= 0:
+        return None
+      bloc = None
+      try:
+        bloc = message.recv(rem_length)
+      except:
+        return None
+      if not bloc:
+        return None
+      rem_length -= len(bloc)
+      resp = resp + bloc
     if not self._read_headers(resp[:body_pos].decode('ISO-8859-1')):
       return None
-    try:
-      body_len = int(self.header('Content-Length'))
-    except:
-      return None
-    if body_pos + body_len > max_length:
-      return None
-    if isinstance(request, socket.socket):
+    if not body:
+      self.body = b''
+      return True
+    if self.header('Transfer-Encoding', '').lower() != 'chunked':
+      try:
+        body_len = int(self.header('Content-Length'))
+      except:
+        return None
+      if body_pos + body_len - len(resp) > rem_length:
+        return None
       while len(resp) < body_pos + body_len:
+        if not isinstance(message, socket.socket):
+          return None
         bloc = None
         try:
-          bloc = request.recv(body_pos + body_len - len(resp))
+          bloc = message.recv(body_pos + body_len - len(resp))
         except:
           return None
         if not bloc:
           return None
         resp = resp + bloc
-    self.body = resp[body_pos:].decode('UTF-8')
+      self.body = resp[body_pos:body_pos + body_len]
+    else:
+      buff = resp[body_pos:]
+      self.body = b''
+      chunk_len = -1
+      while chunk_len != 0:
+        chunk_pos = -1
+        while chunk_pos < 0:
+          buff = buff.lstrip(b'\r\n')
+          chunk_pos = buff.find(b'\r\n')
+          if chunk_pos >= 0:
+            chunk_pos += 2
+            break
+          chunk_pos = buff.find(b'\n')
+          if chunk_pos >= 0:
+            chunk_pos += 1
+            break
+          if not isinstance(message, socket.socket) or rem_length <= 0:
+            return None
+          bloc = None
+          try:
+            bloc = message.recv(rem_length)
+          except:
+            return None
+          if not bloc:
+            return None
+          rem_length -= len(bloc)
+          buff = buff + bloc
+        try:
+          chunk_len = int(buff[:chunk_pos].rstrip(b'\r\n'), 16)
+        except:
+          return None
+        if chunk_pos + chunk_len - len(buff) > rem_length:
+          return None
+        while len(buff) < chunk_pos + chunk_len:
+          if not isinstance(message, socket.socket):
+            return None
+          bloc = None
+          try:
+            bloc = message.recv(chunk_pos + chunk_len - len(buff))
+          except:
+            return None
+          if not bloc:
+            return None
+          rem_length -= len(bloc)
+          buff = buff + bloc
+        self.body = self.body + buff[chunk_pos:chunk_pos+chunk_len]
+        buff = buff[chunk_pos+chunk_len:]
+      buff = b'\r\n' + buff
+      self.headers['Content-Length'.upper()] = len(self.body)
+      while not (b'\r\n\r\n' in buff or b'\n\n' in buff):
+        if not isinstance(message, socket.socket) or rem_length <= 0:
+          return None
+        bloc = None
+        try:
+          bloc = message.recv(rem_length)
+        except:
+          return None
+        if not bloc:
+          return None
+        rem_length -= len(bloc)
+        buff = buff + bloc
     return True
+
 
 ULONG_PTR = ctypes.c_uint64
 DWORD = ctypes.wintypes.DWORD
@@ -706,13 +770,7 @@ class DLNARequestHandler(socketserver.StreamRequestHandler):
         else:
           timeout = 10000
         try:
-          callback_p =  urllib.parse.urlparse(req.header('CALLBACK').lstrip('< ').rstrip('> '))
-          callback = [(callback_p.hostname, callback_p.port), callback_p.path or '/']
-          if not callback_p.hostname:
-            callback = None
-          else:
-            if not callback_p.port:
-              callback[0][1] = 80
+          callback = req.header('CALLBACK').lstrip('< ').rstrip('> ')
         except:
           callback = None
         if callback and self.Renderer.is_events_manager_running:
@@ -998,18 +1056,16 @@ class EventSubscription:
                 nb_skipped += 1
                 continue
         nb_skipped = 0
-        msg = 'NOTIFY ' + self.Callback[1] + ' HTTP/1.1\r\n' \
-        'Host: ' + self.Callback[0][0] + ':' + str(self.Callback[0][1]) + '\r\n' \
-        'Content-Type: text/xml; charset="utf-8"\r\n' \
-        'Content-Length: ##len##\r\n' \
-        'NT: upnp:event\r\n' \
-        'NTS: upnp:propchange\r\n' \
-        'SID: ' + self.SID + '\r\n' \
-        'SEQ: ' + str(self.SEQ) + '\r\n' \
-        'Connection: close\r\n' \
-        'User-Agent: DLNAmpvRenderer\r\n' \
-        'Cache-Control: no-cache\r\n' \
-        '\r\n'
+        msg_headers= {
+          'Content-Type': 'text/xml; charset="utf-8"',
+          'NT': 'upnp:event',
+          'NTS': 'upnp:propchange',
+          'SID': self.SID,
+          'SEQ': str(self.SEQ),
+          'Connection': 'close',
+          'User-Agent': 'DLNAmpvRenderer',
+          'Cache-Control': 'no-cache'
+        }
         if self.Service.Id[23:].lower() == 'ConnectionManager'.lower():
           msg_body = '<?xml version="1.0"?>\n' \
         '<e:propertyset xmlns:e="urn:schemas-upnp-org:event-1-0">##prop##</e:propertyset>'
@@ -1022,14 +1078,12 @@ class EventSubscription:
           for prop_name, prop_value in event:
             msg_body = msg_body.replace('##prop##', html.escape('<' + prop_name + ' val="' + html.escape(prop_value) + '"/>##prop##'))
           msg_body = msg_body.replace('##prop##', '').encode('UTF-8')
-        self.Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
-        self.Socket.settimeout(30)
+        msg_headers['Content-Length'] = str(len(msg_body))
         try:
-          self.Socket.connect(self.Callback[0])
-          self.Socket.sendall(msg.replace('##len##', str(len(msg_body))).encode('ISO-8859-1') + msg_body)
+          req = urllib.request.Request(self.Callback, data=msg_body, headers=msg_headers, method='NOTIFY')
+          resp = urllib.request.urlopen(req, timeout=30)
           self.logger.log('Souscription %s - envoi de la notification d\'événement %d: ' % (self.SID, self.SEQ) + ', '.join('(' + prop_name + ': ' + prop_value + ')' for (prop_name, prop_value) in event), 2)
-          resp = HTTPMessage(self.Socket, timeout=30)
-          if resp.code == '200':
+          if resp.code == 200:
             self.logger.log('Souscription %s - réception de l\'accusé de réception de la notification d\'événement %d' % (self.SID, self.SEQ), 2)
           else:
             self.logger.log('Souscription %s - échec de la réception de l\'accusé de réception de la notification d\'événement %d - code %s' % (self.SID, self.SEQ, resp.code), 2)
@@ -2210,9 +2264,9 @@ class DLNARenderer:
       service = DLNAService()
       service.Type = _XMLGetNodeText(node.getElementsByTagName('serviceType')[0])
       service.Id = _XMLGetNodeText(node.getElementsByTagName('serviceId')[0])
-      service.ControlURL = '%s%s' % (self.BaseURL, _XMLGetNodeText(node.getElementsByTagName('controlURL')[0]))
-      service.SubscrEventURL = '%s%s' % (self.BaseURL, _XMLGetNodeText(node.getElementsByTagName('eventSubURL')[0]))
-      service.DescURL = '%s%s' % (self.BaseURL, _XMLGetNodeText(node.getElementsByTagName('SCPDURL')[0]))
+      service.ControlURL = urllib.parse.urljoin(self.BaseURL, _XMLGetNodeText(node.getElementsByTagName('controlURL')[0]))
+      service.SubscrEventURL = urllib.parse.urljoin(self.BaseURL, _XMLGetNodeText(node.getElementsByTagName('eventSubURL')[0]))
+      service.DescURL = urllib.parse.urljoin(self.BaseURL, _XMLGetNodeText(node.getElementsByTagName('SCPDURL')[0]))
       root_s_xml = minidom.parseString(eval('DLNARenderer.%s_SCPD' % service.Id[23:]))
       for node_s in root_s_xml.getElementsByTagName('action'):
         action = DLNAAction()
@@ -2497,16 +2551,17 @@ class DLNARenderer:
           rep = True
         else:
           rep = _open_url(uri, method='HEAD', test_range=True)
-          server = rep.getheader('Server') or ''
-          if rep.getheader('Accept-Ranges'):
-            if rep.getheader('Accept-Ranges').lower() != 'none':
+          if rep:
+            server = rep.getheader('Server', '')
+            if rep.getheader('Accept-Ranges'):
+              if rep.getheader('Accept-Ranges').lower() != 'none':
+                accept_range = True
+              else:
+                saccept_range = False
+            elif rep.status == 206:
               accept_range = True
             else:
-              saccept_range = False
-          elif rep.status == 206:
-            accept_range = True
-          else:
-            accept_range = False
+              accept_range = False
       if not rep:
         self.events_add('AVTransport', (('TransportStatus', "ERROR_OCCURRED"),))
         self.events_add('AVTransport', (('TransportStatus', "OK"),))
