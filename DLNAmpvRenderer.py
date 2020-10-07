@@ -2557,7 +2557,7 @@ class DLNARenderer:
               if rep.getheader('Accept-Ranges').lower() != 'none':
                 accept_range = True
               else:
-                saccept_range = False
+                accept_range = False
             elif rep.status == 206:
               accept_range = True
             else:
