@@ -22,9 +22,9 @@ To run the application:
   --name RENDERER_NAME: the name of the renderer, used to generate the uuid    
   --minimize: when set, minimizes the window of mpv when inactive and restore it to its previous size when a playback is launched (useful when displaying photos as some controlers stop the playback between two consecutive pictures or when playing music as there is no use showing the window)    
   --fullscreen: when set, makes mpv go fullscreen each time a playback starts (can be combined with 'minimize')    
-  --rotate_jpeg: when set, tries to read the orientation metadata of jpeg pictures, and send an accordingly rotation command to mpv, to make up for the inability of the player (due to ffmpeg) to do so by itself (the day when ffmpeg manages EXIF orientation for pictures, it will no longer be needed)
+  --rotate_jpeg: when set, tries to read the orientation metadata of jpeg pictures, and send an accordingly rotation command to mpv, to make up for the inability of the player (due to ffmpeg) to do so by itself (the day when ffmpeg manages EXIF orientation for pictures, it will no longer be needed)    
   --wmpdmc_no_mkv: when set, Windows Media Player Digital Media Controller will transcode 'mkv' (matroska) files to 'mpegts' before streaming the content, allowing remote control of the playback, otherwise, the 'mkv' file will be streamed as it is, and the seekbar will probably be inactive in WMPDMC (but available in mpv)    
-  --trust_controler: when set, the URL of the content sent to the renderer is not checked before being passed to mpv (useful to play local content by sending the path to the file, if the controler allows it, which is the case of DLNAPlayOn with '-t n')    
+  --trust_controler: when set, the URL of the content sent to the renderer is not checked before being passed to mpv (useful to play local content by sending the path to the file, if the controler allows it, which is the case of DLNAPlayOn with '-t n'), which will not work if the server throws errors at range requests (as some DLNA servers do)    
   --verbosity VERBOSE: for troubleshooting purposes, from 0 (default) to 2  
 
  Example: DLNAmpvRenderer -p 9100 -m -f -r
