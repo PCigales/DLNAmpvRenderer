@@ -16,7 +16,7 @@ To run the application:
 
  DLNAmpvRenderer -h to display the complete syntax of command line and abbreviated commands
     
- DLNAmpvRenderer [-h] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--wmpdmc_no_mkv] [--trust_controler] [--verbosity VERBOSE]  
+ DLNAmpvRenderer [-h] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--wmpdmc_no_mkv] [--trust_controler] [--search_subtitles] [--verbosity VERBOSE]  
     
   --port RENDERER_TCP_PORT: the port used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests    
   --name RENDERER_NAME: the name of the renderer, used to generate the uuid    
@@ -25,6 +25,7 @@ To run the application:
   --rotate_jpeg: when set, tries to read the orientation metadata of jpeg pictures, and send an accordingly rotation command to mpv, to make up for the inability of the player (due to ffmpeg) to do so by itself (the day when ffmpeg manages EXIF orientation for pictures, it will no longer be needed)    
   --wmpdmc_no_mkv: when set, Windows Media Player Digital Media Controller will transcode 'mkv' (matroska) files to 'mpegts' before streaming the content, allowing remote control of the playback, otherwise, the 'mkv' file will be streamed as it is, and the seekbar will probably be inactive in WMPDMC (but available in mpv)    
   --trust_controler: when set, the URL of the content sent to the renderer is not checked before being passed to mpv (useful to play local content by sending the path to the file, if the controler allows it, which is the case of DLNAPlayOn with '-t n'), which will not work if the server throws errors at range requests (as some DLNA servers do)    
+  --search_subtitles: when set, always requests subtitles, trying different extensions if no subtitle uri is provided by the controler or the server (may slow down the process)     
   --verbosity VERBOSE: for troubleshooting purposes, from 0 (default) to 2  
 
  Example: DLNAmpvRenderer -p 9100 -m -f -r
