@@ -2222,7 +2222,7 @@ class DLNARenderer:
   'rtsp-rtp-udp:*:video/x-ms-wmv:*,' \
   'rtsp-rtp-udp:*:audio/x-asf-pf:*'
 
-  def __init__(self, RendererPort=8000, Minimize=False, FullScreen=False, JpegRotate=False, WMPDMCHideMKV=False, TrustControler=False, verbosity=0):
+  def __init__(self, RendererPort=8000, Minimize=False, FullScreen=False, JpegRotate=False, WMPDMCHideMKV=False, TrustControler=False, SearchSubtitles=False, verbosity=0):
     self.verbosity = verbosity
     self.logger = log_event(verbosity)
     self.ip = socket.gethostbyname(socket.getfqdn())
@@ -2233,6 +2233,7 @@ class DLNARenderer:
     self.JpegRotate = JpegRotate
     self.WMPDMCHideMKV = WMPDMCHideMKV
     self.TrustControler = TrustControler
+    self.SearchSubtitles = SearchSubtitles
     self.IPCmpvControlerInstance = IPCmpvControler(title_name=NAME + ':%s' % RendererPort , verbosity=verbosity)
     self.is_search_manager_running = None
     self.is_request_manager_running = None
@@ -2581,7 +2582,7 @@ class DLNARenderer:
         rep = _open_url(self.AVTransportSubURI, method='HEAD')
         if not rep:
           self.AVTransportSubURI = ""
-      if not self.TrustControler and 'object.item.videoItem'.lower() in upnp_class.lower() and not self.AVTransportSubURI and not 'Microsoft-HTTPAPI'.lower() in server.lower() and not "BubbleUPnP".lower() in server.lower():
+      if self.SearchSubtitles and 'object.item.videoItem'.lower() in upnp_class.lower() and not self.AVTransportSubURI and not 'Microsoft-HTTPAPI'.lower() in server.lower() and not "BubbleUPnP".lower() in server.lower():
         uri_name = uri.rsplit('.', 1)[0]
         for sub_ext in ('.ttxt', '.txt', '.smi', '.srt', '.sub', '.ssa', '.ass'):
           rep = _open_url(uri_name + sub_ext, method='HEAD', timeout=2)
@@ -2739,6 +2740,7 @@ if __name__ == '__main__':
   parser.add_argument('--rotate_jpeg', '-r', help='rotation automatique des images jpeg [désactivé par défaut]', action='store_true')
   parser.add_argument('--wmpdmc_no_mkv', '-w', help='masque la prise en charge du format matroska à WMPDMC pour permettre le contrôle distant [désactivé par défaut]', action='store_true')
   parser.add_argument('--trust_controler', '-t', help='désactive la vérification des adresses avant leur transmission à mpv [désactivé par défaut]', action='store_true')
+  parser.add_argument('--search_subtitles', '-s', help='active la recherche systématique de sous-titres [désactivé par défaut]', action='store_true')
   parser.add_argument('--verbosity', '-v', metavar='VERBOSE', help='niveau de verbosité de 0 à 2 [0 par défaut]', type=int, choices=[0, 1, 2], default=0)
 
   args = parser.parse_args()
@@ -2746,7 +2748,7 @@ if __name__ == '__main__':
     NAME = args.name
     UDN = 'uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, args.name))
     DLNARenderer.Device_SCPD = DLNARenderer.Device_SCPD.replace('DLNAmpvRenderer', html.escape(NAME)).replace('uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, 'DLNAmpvRenderer')), UDN)
-  Renderer = DLNARenderer(args.port, args.minimize, args.fullscreen, args.rotate_jpeg, args.wmpdmc_no_mkv, args.trust_controler, args.verbosity)
+  Renderer = DLNARenderer(args.port, args.minimize, args.fullscreen, args.rotate_jpeg, args.wmpdmc_no_mkv, args.trust_controler, args.search_subtitles, args.verbosity)
   print('Appuyez sur "S" ou fermez mpv pour stopper')
   print('Appuyez sur "M" pour activer/désactiver le passage en mode minimisé quand inactif - mode actuel: %s' % ('activé' if Renderer.Minimize else 'désactivé'))
   print('Appuyez sur "F" pour activer/désactiver le passage en mode plein écran à chaque session - mode actuel: %s' % ('activé' if Renderer.FullScreen else 'désactivé'))
