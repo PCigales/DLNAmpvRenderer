@@ -217,6 +217,12 @@ class HTTPMessage():
         return None
       if body_pos + body_len - len(resp) > rem_length:
         return None
+    if self.header('Expect', '').lower() == '100-continue' and isinstance(message, socket.socket):
+      try:
+        message.sendall('HTTP/1.1 100 Continue\r\n\r\n'.encode('ISO-8859-1'))
+      except:
+        return None
+    if self.header('Transfer-Encoding', '').lower() != 'chunked':
       while len(resp) < body_pos + body_len:
         if not isinstance(message, socket.socket):
           return None
@@ -320,7 +326,7 @@ LPOVERLAPPED_COMPLETION_ROUTINE = WINFUNCTYPE(None, DWORD, DWORD, LPOVERLAPPED)
 
 class IPCmpvControler(threading.Thread):
 
-  SCRIPT_PATH = os.path.dirname(sys.argv[0])
+  SCRIPT_PATH = os.path.dirname(__file__)
 
   def _Py_ReadFileEx_Completion_Routine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped):
     kernel32.SetEvent(lpOverlapped.contents.hEvent)
@@ -2255,7 +2261,7 @@ class DLNARenderer:
     self.UDN = _XMLGetNodeText(root_xml.getElementsByTagName('UDN')[0])
     self.IconURL = self.BaseURL + _XMLGetNodeText(root_xml.getElementsByTagName('icon')[-1].getElementsByTagName('url')[0])
     try:
-      f = open(os.path.dirname(sys.argv[0]) + r"\icon.png",'rb')
+      f = open(os.path.dirname(__file__) + r"\icon.png",'rb')
       self.Icon = f.read()
       f.close()
     except:
