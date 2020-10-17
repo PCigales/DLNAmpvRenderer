@@ -3,7 +3,6 @@ import threading
 import msvcrt
 import ctypes, ctypes.wintypes
 import os
-import sys
 import contextlib
 from functools import partial
 import socket
