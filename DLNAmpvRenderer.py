@@ -1060,6 +1060,10 @@ class EventSubscription:
               if len(self.Events) >= 5 or nb_skipped < len(self.Events) - 1:
                 nb_skipped += 1
                 continue
+        if len(event) == 1 and event[0][0].lower() == 'Volume channel="Master"'.lower():
+          if len(self.Events) > 0:
+            if len(self.Events[0]) == 1 and self.Events[0][0][0].lower() == 'Volume channel="Master"'.lower():
+              continue
         nb_skipped = 0
         msg_headers= {
           'Content-Type': 'text/xml; charset="utf-8"',
