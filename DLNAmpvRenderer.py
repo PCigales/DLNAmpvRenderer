@@ -13,7 +13,6 @@ from xml.dom import minidom
 import time
 import uuid
 import subprocess
-from io import BytesIO
 import json
 import html
 import argparse
