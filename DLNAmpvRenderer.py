@@ -1,5 +1,4 @@
 import threading
-import threading
 import msvcrt
 import ctypes, ctypes.wintypes
 import os
