@@ -665,7 +665,7 @@ class DLNARequestHandler(socketserver.StreamRequestHandler):
     try:
       super().__init__(*args, **kwargs)
     except:
-      raise
+      pass
   
   def handle(self):
     if not self.Renderer.is_request_manager_running:
@@ -2577,9 +2577,9 @@ class DLNARenderer:
         self.IPCmpvControlerInstance.Player_event_event.set()
         return '716', None
       self.AVTransportURI = uri
-      if self.TrustControler:
+      if rep == True:
         self.AVTransportSubURI = caption_info
-      elif rep != True:
+      else:
         self.AVTransportSubURI = rep.getheader('CaptionInfo.sec', caption_info)
         rep.close()
       rep = None
@@ -2592,7 +2592,6 @@ class DLNARenderer:
           self.AVTransportSubURI = ""
         elif rep != True:
           rep.close()
-          print('close')
       if self.SearchSubtitles and 'object.item.videoItem'.lower() in upnp_class.lower() and not self.AVTransportSubURI and r'://' in uri and not 'Microsoft-HTTPAPI'.lower() in server.lower() and not "BubbleUPnP".lower() in server.lower():
         uri_name = uri.rsplit('.', 1)[0]
         for sub_ext in ('.ttxt', '.txt', '.smi', '.srt', '.sub', '.ssa', '.ass'):
