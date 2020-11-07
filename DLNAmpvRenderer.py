@@ -665,7 +665,7 @@ class DLNARequestHandler(socketserver.StreamRequestHandler):
     try:
       super().__init__(*args, **kwargs)
     except:
-      pass
+      raise
   
   def handle(self):
     if not self.Renderer.is_request_manager_running:
@@ -2557,19 +2557,17 @@ class DLNARenderer:
       if uri:
         if self.TrustControler:
           rep = True
-        else:
+        elif r'://' in uri:
           rep = _open_url(uri, method='HEAD', test_range=True)
           if rep:
             server = rep.getheader('Server', '')
             if rep.getheader('Accept-Ranges'):
-              if rep.getheader('Accept-Ranges').lower() != 'none':
-                accept_range = True
-              else:
+              if rep.getheader('Accept-Ranges').lower() == 'none':
                 accept_range = False
-            elif rep.status == 206:
-              accept_range = True
-            else:
+            elif rep.status != 206:
               accept_range = False
+        else:
+          rep = os.path.isfile(uri)
       if not rep:
         self.events_add('AVTransport', (('TransportStatus', "ERROR_OCCURRED"),))
         self.events_add('AVTransport', (('TransportStatus', "OK"),))
@@ -2581,15 +2579,21 @@ class DLNARenderer:
       self.AVTransportURI = uri
       if self.TrustControler:
         self.AVTransportSubURI = caption_info
-      else:
+      elif rep != True:
         self.AVTransportSubURI = rep.getheader('CaptionInfo.sec', caption_info)
         rep.close()
       rep = None
       if self.AVTransportSubURI and not self.TrustControler:
-        rep = _open_url(self.AVTransportSubURI, method='HEAD')
+        if r'://' in uri:
+          rep = _open_url(self.AVTransportSubURI, method='HEAD')
+        else:
+          rep = os.path.isfile(self.AVTransportSubURI)
         if not rep:
           self.AVTransportSubURI = ""
-      if self.SearchSubtitles and 'object.item.videoItem'.lower() in upnp_class.lower() and not self.AVTransportSubURI and not 'Microsoft-HTTPAPI'.lower() in server.lower() and not "BubbleUPnP".lower() in server.lower():
+        elif rep != True:
+          rep.close()
+          print('close')
+      if self.SearchSubtitles and 'object.item.videoItem'.lower() in upnp_class.lower() and not self.AVTransportSubURI and r'://' in uri and not 'Microsoft-HTTPAPI'.lower() in server.lower() and not "BubbleUPnP".lower() in server.lower():
         uri_name = uri.rsplit('.', 1)[0]
         for sub_ext in ('.ttxt', '.txt', '.smi', '.srt', '.sub', '.ssa', '.ass'):
           rep = _open_url(uri_name + sub_ext, method='HEAD', timeout=2)
