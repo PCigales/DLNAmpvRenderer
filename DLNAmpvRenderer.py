@@ -1030,7 +1030,7 @@ class EventSubscription:
     self.logger = self.Renderer.logger
     self.Service = next((serv for serv in renderer.Services if serv.Id.lower() == ('urn:upnp-org:serviceId:' + service).lower()), None)
     sub_time = time.time()
-    self.SID = 'uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, str(sub_time)))
+    self.SID = 'uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, service + str(sub_time)))
     self.End_time_lock = threading.Lock()
     self.End_time = sub_time + timeout
     self.Callback = callback
