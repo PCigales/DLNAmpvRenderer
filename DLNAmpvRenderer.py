@@ -2708,7 +2708,11 @@ class DLNARenderer:
       action_id = self.ActionsReceived
       self.ActionsReceived += 1
     self.logger.log('Mise en queue de l\'action %d %s-%s' % (action_id, servi, acti), 2)
-    res, out_args = self._process_action(action_id, servi, acti, args, agent)
+    try:
+      res, out_args = self._process_action(action_id, servi, acti, args, agent)
+    except:
+      res = '701'
+      out_args = None
     if res == '200':
       self.logger.log('Succès du traitement de l\'action %d %s-%s' % (action_id, servi, acti), 1)
     else:
