@@ -2232,7 +2232,7 @@ class DLNARenderer:
   def __init__(self, RendererPort=8000, Minimize=False, FullScreen=False, JpegRotate=False, WMPDMCHideMKV=False, TrustControler=False, SearchSubtitles=False, verbosity=0):
     self.verbosity = verbosity
     self.logger = log_event(verbosity)
-    self.ip = socket.gethostbyname(socket.getfqdn())
+    self.ip = socket.gethostbyname(socket.gethostname())
     self.port = RendererPort
     self.Minimize = Minimize
     self.FullScreen = FullScreen
