@@ -150,7 +150,10 @@ class HTTPMessage():
         try:
           a, b, c = msg_line.strip().split(None, 2)
         except:
-          return
+          try:
+            a, b, c = *msg_line.strip().split(None, 2), ''
+          except:
+            return
       else:
         try:
           header_name, header_value = msg_line.split(':', 1)
@@ -204,7 +207,7 @@ class HTTPMessage():
       resp = resp + bloc
     if not self._read_headers(resp[:body_pos].decode('ISO-8859-1')):
       return None
-    if not body:
+    if not body or self.code in ('204', '304'):
       self.body = b''
       return True
     if self.header('Transfer-Encoding', '').lower() != 'chunked':
@@ -2232,7 +2235,16 @@ class DLNARenderer:
   def __init__(self, RendererPort=8000, Minimize=False, FullScreen=False, JpegRotate=False, WMPDMCHideMKV=False, TrustControler=False, SearchSubtitles=False, verbosity=0):
     self.verbosity = verbosity
     self.logger = log_event(verbosity)
-    self.ip = socket.gethostbyname(socket.gethostname())
+    try:
+      self.ip = socket.gethostbyname(socket.gethostname())
+    except:
+      try:
+        self.ip = socket.gethostbyname(socket.getfqdn())
+      except:
+         s = socket.socket(type=socket.SOCK_DGRAM)
+         s.connect(('239.255.255.250', 1900))
+         self.ip = s.getsockname()[0]
+         s.close()
     self.port = RendererPort
     self.Minimize = Minimize
     self.FullScreen = FullScreen
