@@ -326,7 +326,7 @@ LPOVERLAPPED_COMPLETION_ROUTINE = WINFUNCTYPE(None, DWORD, DWORD, LPOVERLAPPED)
 
 class IPCmpvControler(threading.Thread):
 
-  SCRIPT_PATH = os.path.dirname(__file__)
+  SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
 
   def _Py_ReadFileEx_Completion_Routine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped):
     kernel32.SetEvent(lpOverlapped.contents.hEvent)
@@ -718,7 +718,7 @@ class DLNARequestHandler(socketserver.StreamRequestHandler):
         except:
           self.server.logger.log('Échec de la réponse à la requête %s: %s' % (req.method, dict_scpd[req.path]), 1)
       elif req.path.lower() == '/icon.png':
-        resp_body = Renderer.Icon
+        resp_body = self.Renderer.Icon
         try:
           if req.method == 'GET':
             self.request.sendall(resp.replace('##type##', 'image/png').replace('##len##', str(len(resp_body))).encode('ISO-8859-1') + resp_body)
@@ -2274,7 +2274,7 @@ class DLNARenderer:
     self.UDN = _XMLGetNodeText(root_xml.getElementsByTagName('UDN')[0])
     self.IconURL = self.BaseURL + _XMLGetNodeText(root_xml.getElementsByTagName('icon')[-1].getElementsByTagName('url')[0])
     try:
-      f = open(os.path.dirname(__file__) + r"\icon.png",'rb')
+      f = open(os.path.dirname(os.path.abspath(__file__)) + r"\icon.png",'rb')
       self.Icon = f.read()
       f.close()
     except:
