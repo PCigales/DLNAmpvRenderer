@@ -490,13 +490,14 @@ class IPCmpvControler(threading.Thread):
     self.mpv_thread.start()
     request_id = 0
     while self.Cmd_buffer[0] != "quit":
-      self.Pipe_handle = HANDLE(kernel32.CreateFileW(LPWSTR(r'\\.\pipe\mpv_%s' % urllib.parse.quote(self.title_name, safe='')), DWORD(0xc0000000), DWORD(0), PVOID(0), DWORD(4), DWORD(0x60000000), HANDLE(0)))
+      hnd = HANDLE(kernel32.CreateFileW(LPWSTR(r'\\.\pipe\mpv_%s' % urllib.parse.quote(self.title_name, safe='')), DWORD(0xc0000000), DWORD(0), PVOID(0), DWORD(4), DWORD(0x60000000), HANDLE(0)))
       if kernel32.GetLastError() == 2:
         time.sleep(0.5)
       else:
+        self.Pipe_handle = hnd
         break
     if kernel32.GetLastError() == 2:
-      self.logger.log('Lecteur - échec du lancement', 1)
+      self.logger.log('Lecteur - échec du lancement', 0)
       return False
     self.incoming_msg_thread = threading.Thread(target=self.manage_incoming_msg)
     self.incoming_msg_thread.start()
@@ -2232,19 +2233,26 @@ class DLNARenderer:
   'rtsp-rtp-udp:*:video/x-ms-wmv:*,' \
   'rtsp-rtp-udp:*:audio/x-asf-pf:*'
 
-  def __init__(self, RendererPort=8000, Minimize=False, FullScreen=False, JpegRotate=False, WMPDMCHideMKV=False, TrustControler=False, SearchSubtitles=False, verbosity=0):
+  def __init__(self, RendererIp='', RendererPort=8000, Minimize=False, FullScreen=False, JpegRotate=False, WMPDMCHideMKV=False, TrustControler=False, SearchSubtitles=False, verbosity=0):
     self.verbosity = verbosity
     self.logger = log_event(verbosity)
-    try:
-      self.ip = socket.gethostbyname(socket.gethostname())
-    except:
+    if RendererIp:
+      self.ip = RendererIp
+    else:
       try:
-        self.ip = socket.gethostbyname(socket.getfqdn())
+        s = socket.socket(type=socket.SOCK_DGRAM)
+        s.connect(('239.255.255.250', 1900))
+        self.ip = s.getsockname()[0]
+        s.close()
       except:
-         s = socket.socket(type=socket.SOCK_DGRAM)
-         s.connect(('239.255.255.250', 1900))
-         self.ip = s.getsockname()[0]
-         s.close()
+        try:
+          self.ip = socket.gethostbyname(socket.gethostname())
+        except:
+          try:
+            self.ip = socket.gethostbyname(socket.getfqdn())
+          except:
+            self.ip = ''
+            self.logger.log('Échec de la récupération de l\'addresse ip de l\'hôte', 0)
     self.port = RendererPort
     self.Minimize = Minimize
     self.FullScreen = FullScreen
@@ -2390,9 +2398,16 @@ class DLNARenderer:
 
   def _start_request_manager(self):
     DLNARequestBoundHandler = partial(DLNARequestHandler, renderer=self)
-    with DLNARequestServer((self.ip, self.port), DLNARequestBoundHandler, verbosity=self.verbosity) as self.DLNARequestManager:
-      self.DLNARequestManager.serve_forever()
-    self.is_request_manager_running = None
+    try:
+      with DLNARequestServer((self.ip, self.port), DLNARequestBoundHandler, verbosity=self.verbosity) as self.DLNARequestManager:
+        self.DLNARequestManager.serve_forever()
+    except:
+      while self.IPCmpvControlerInstance.Pipe_handle == None and self.IPCmpvControlerInstance.Cmd_buffer[0] != "quit":
+        time.sleep(0.1)
+      self.mpv_shutdown_event.set()
+      self.logger.log('Échec du démarrage de l\'écoute des requêtes à l\'adresse %s:%s' % (self.ip, self.port), 0)
+    finally:
+      self.is_request_manager_running = None
 
   def _shutdown_request_manager(self):
     if self.is_request_manager_running:
@@ -2409,7 +2424,7 @@ class DLNARenderer:
       self.logger.log('Écoute des requêtes déjà activée', 1)
     else:
       self.is_request_manager_running = True
-      self.logger.log('Démarrage de l\'écoute des requêtes', 1)
+      self.logger.log('Démarrage de l\'écoute des requêtes à l\'adresse %s:%s' % (self.ip, self.port), 1)
       manager_thread = threading.Thread(target=self._start_request_manager)
       manager_thread.start()
   
@@ -2735,6 +2750,9 @@ class DLNARenderer:
     return res, out_args
 
   def start(self):
+    if not self.ip:
+      self.mpv_shutdown_event.set()
+      return
     self.IPCmpvControlerInstance.start()
     if self.Minimize:
       self.send_command(('set_property', 'window-minimized', True))
@@ -2759,6 +2777,7 @@ if __name__ == '__main__':
   formatter = lambda prog: argparse.HelpFormatter(prog, max_help_position=50, width=119)
   CustomArgumentParser = partial(argparse.ArgumentParser, formatter_class=formatter)
   parser = CustomArgumentParser()
+  parser.add_argument('--bind', '-b', metavar='RENDERER_TCP_IP', help='adresse IP du renderer [auto-sélectionnée par défaut]', default='')
   parser.add_argument('--port', '-p', metavar='RENDERER_TCP_PORT', help='port TCP du renderer [8000 par défaut]', type=int, default=8000)
   parser.add_argument('--name', '-n', metavar='RENDERER_NAME', help='nom du renderer [DLNAmpvRenderer par défaut]', default='DLNAmpvRenderer')
   parser.add_argument('--minimize', '-m', help='passage en mode minimisé quand inactif [désactivé par défaut]', action='store_true')
@@ -2774,7 +2793,7 @@ if __name__ == '__main__':
     NAME = args.name
     UDN = 'uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, args.name))
     DLNARenderer.Device_SCPD = DLNARenderer.Device_SCPD.replace('DLNAmpvRenderer', html.escape(NAME)).replace('uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, 'DLNAmpvRenderer')), UDN)
-  Renderer = DLNARenderer(args.port, args.minimize, args.fullscreen, args.rotate_jpeg, args.wmpdmc_no_mkv, args.trust_controler, args.search_subtitles, args.verbosity)
+  Renderer = DLNARenderer(args.bind, args.port, args.minimize, args.fullscreen, args.rotate_jpeg, args.wmpdmc_no_mkv, args.trust_controler, args.search_subtitles, args.verbosity)
   print('Appuyez sur "S" ou fermez mpv pour stopper')
   print('Appuyez sur "M" pour activer/désactiver le passage en mode minimisé quand inactif - mode actuel: %s' % ('activé' if Renderer.Minimize else 'désactivé'))
   print('Appuyez sur "F" pour activer/désactiver le passage en mode plein écran à chaque session - mode actuel: %s' % ('activé' if Renderer.FullScreen else 'désactivé'))
