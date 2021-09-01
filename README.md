@@ -16,8 +16,9 @@ To run the application:
 
  DLNAmpvRenderer -h to display the complete syntax of command line and abbreviated commands
     
- DLNAmpvRenderer [-h] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--rotate_jpeg] [--wmpdmc_no_mkv] [--trust_controler] [--search_subtitles] [--verbosity VERBOSE]  
+ DLNAmpvRenderer [-h] [--bind RENDERER_TCP_IP] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--rotate_jpeg] [--wmpdmc_no_mkv] [--trust_controler] [--search_subtitles] [--verbosity VERBOSE]  
     
+  --bind RENDERER_TCP_IP: the ip address used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests (to set it manually if the script does not manage to self-determine the ip address of the host or to select a specific network interface)
   --port RENDERER_TCP_PORT: the port used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests    
   --name RENDERER_NAME: the name of the renderer, used to generate the uuid    
   --minimize: when set, minimizes the window of mpv when inactive and restore it to its previous size when a playback is launched (useful when displaying photos as some controlers stop the playback between two consecutive pictures or when playing music as there is no use showing the window)    
