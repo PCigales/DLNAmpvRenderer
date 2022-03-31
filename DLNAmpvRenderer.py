@@ -2782,7 +2782,7 @@ if __name__ == '__main__':
   parser.add_argument('--name', '-n', metavar='RENDERER_NAME', help='nom du renderer [DLNAmpvRenderer par défaut]', default='DLNAmpvRenderer')
   parser.add_argument('--minimize', '-m', help='passage en mode minimisé quand inactif [désactivé par défaut]', action='store_true')
   parser.add_argument('--fullscreen', '-f', help='passage en mode plein écran à chaque session [désactivé par défaut]', action='store_true')
-  parser.add_argument('--rotate_jpeg', '-r', help='rotation automatique des images jpeg [désactivé par défaut]', action='store_true')
+  parser.add_argument('--rotate_jpeg', '-r', help='rotation automatique des images jpeg [désactivé par défaut, était nécessaire avec les anciennes versions de mpv]', action='store_true')
   parser.add_argument('--wmpdmc_no_mkv', '-w', help='masque la prise en charge du format matroska à WMPDMC pour permettre le contrôle distant [désactivé par défaut]', action='store_true')
   parser.add_argument('--trust_controler', '-t', help='désactive la vérification des adresses avant leur transmission à mpv [désactivé par défaut]', action='store_true')
   parser.add_argument('--search_subtitles', '-s', help='active la recherche systématique de sous-titres [désactivé par défaut]', action='store_true')
