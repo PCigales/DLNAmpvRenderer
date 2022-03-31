@@ -1,8 +1,11 @@
+# DLNAmpvRenderer v1.1.8 (https://github.com/PCigales/DLNAmpvRenderer)
+# Copyright © 2022 PCigales
+# This program is licensed under the GNU GPLv3 copyleft license (see https://www.gnu.org/licenses)
+
 import threading
 import msvcrt
 import ctypes, ctypes.wintypes
 import os
-import contextlib
 from functools import partial
 import socket
 import socketserver
@@ -645,8 +648,10 @@ class DLNARequestServer(socketserver.ThreadingTCPServer):
   
   def server_bind(self):
     self.conn_sockets = []
-    with contextlib.suppress(Exception):
+    try:
       self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+    except:
+      pass
     super().server_bind()
     
   def process_request_thread(self, request, client_address):
@@ -2773,6 +2778,10 @@ class DLNARenderer:
 
 
 if __name__ == '__main__':
+
+  print('DLNAmpvRenderer v1.1.8 (https://github.com/PCigales/DLNAmpvRenderer)    Copyright © 2022 PCigales')
+  print('Ce programme est sous licence copyleft GNU GPLv3 (voir https://www.gnu.org/licenses).')
+  print('');
 
   formatter = lambda prog: argparse.HelpFormatter(prog, max_help_position=50, width=119)
   CustomArgumentParser = partial(argparse.ArgumentParser, formatter_class=formatter)
