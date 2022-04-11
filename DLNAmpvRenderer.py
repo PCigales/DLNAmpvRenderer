@@ -18,11 +18,77 @@ import uuid
 import subprocess
 import json
 import html
+import locale
 import argparse
 
 
-NAME = 'DLNAmpvRenderer'                        
+NAME = 'DLNAmpvRenderer'
 UDN = 'uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, 'DLNAmpvRenderer'))
+
+
+FR_STRINGS = {
+  'license': 'Ce programme est sous licence copyleft GNU GPLv3 (voir https://www.gnu.org/licenses)',
+  'parser_ip': 'adresse IP du renderer [auto-sélectionnée par défaut]',
+  'parser_port': 'port TCP du renderer [8000 par défaut]',
+  'parser_name': 'nom du renderer [DLNAmpvRenderer par défaut]',
+  'parser_minimized': 'passage en mode minimisé quand inactif [désactivé par défaut]',
+  'parser_fullscreen': 'passage en mode plein écran à chaque session [désactivé par défaut]',
+  'parser_rotation': 'rotation automatique des images jpeg [désactivé par défaut, était nécessaire avec les anciennes versions de mpv]',
+  'parser_mkv': 'masque la prise en charge du format matroska à WMPDMC pour permettre le contrôle distant [désactivé par défaut]',
+  'parser_trust': 'désactive la vérification des adresses avant leur transmission à mpv [désactivé par défaut]',
+  'parser_subtitles': 'active la recherche systématique de sous-titres [désactivé par défaut]',
+  'parser_gapless': 'active la lecture sans blanc (sous réserve de compatibilité avec le contrôleur) [désactivé par défaut]',
+  'parser_verbosity': 'niveau de verbosité de 0 à 2 [0 par défaut]',
+  'keyboard_s': 'Appuyez sur "S" ou fermez mpv pour quitter',
+  'enabled': 'activé',
+  'disabled': 'désactivé',
+  'keyboard_m': 'Appuyez sur "M" pour activer/désactiver le passage en mode minimisé quand inactif - mode actuel: %s',
+  'keyboard_f': 'Appuyez sur "F" pour activer/désactiver le passage en mode plein écran à chaque session - mode actuel: %s',
+  'mode_m': 'Passage en mode minimisé quand inactif: %s',
+  'mode_f': 'Passage en mode plein écran à chaque session: %s',
+  'player_failure': 'Lecteur - échec du lancement',
+  'ip_failure': 'Échec de la récupération de l\'addresse ip de l\'hôte',
+  'request_failure': 'Échec du démarrage de l\'écoute des requêtes à l\'adresse %s:%s',
+  'current_content': 'Contenu en cours: %s | %s | %s',
+  'video': 'vidéo',
+  'audio': 'audio',
+  'image': 'image'
+}
+EN_STRINGS = {
+  'license': 'This program is licensed under the GNU GPLv3 copyleft license (see https://www.gnu.org/licenses)',
+  'parser_ip': 'IP address of the renderer [auto-selected by default]',
+  'parser_port': 'TCP port of the renderer [8000 by default]',
+  'parser_name': 'name of the renderer [DLNAmpvRenderer by default]',
+  'parser_minimized': 'switching to minimized mode when idle [disabled by default]',
+  'parser_fullscreen': 'switching to fullscreen mode at each session [disabled by default]',
+  'parser_rotation': 'automatic rotation of jpeg images [disabled by default, was necessary with the old versions of mpv]',
+  'parser_mkv': 'mask support of matroska format to WMPDMC to allow the remote control [disabled by default]',
+  'parser_trust': 'disable the checking of the addresses before their transmission to mpv [disabled by default]',
+  'parser_subtitles': 'enable systematic search for subtitles [disabled by default]',
+  'parser_gapless': 'enable gapless playback (subject to controller compatibility) [disabled by default]',
+  'parser_verbosity': 'level of verbosity from 0 to 2 [0 by default]',
+  'keyboard_s': 'Press "S" or close mpv to exit',
+  'enabled': 'enabled',
+  'disabled': 'disabled',
+  'keyboard_m': 'Press "M" to toggle the switching to minimized mode when idle - current mode: %s',
+  'keyboard_f': 'Press "F" to toggle the switching to fullscreen mode at each session - current mode: %s',
+  'mode_m': 'Switching to minimized mode when idle: %s',
+  'mode_f': 'Switching to fullscreen mode at each session: %s',
+  'player_failure': 'Player - launch failure',
+  'ip_failure': 'Failure of the retrieval of the host ip address',
+  'request_failure': 'Failure of the startup of the listening of requests at the address %s:%s',
+  'current_content': 'Current content: %s | %s | %s',
+  'video': 'video',
+  'audio': 'audio',
+  'image': 'image'
+}
+
+LSTRINGS = EN_STRINGS
+try:
+  if locale.getdefaultlocale()[0][:2].lower() == 'fr':
+    LSTRINGS = FR_STRINGS
+except:
+  pass
 
 
 class log_event:
@@ -355,8 +421,8 @@ class IPCmpvControler(threading.Thread):
     self.Pipe_buffer = ctypes.create_string_buffer(10000)
     self.Cmd_Event = HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR(urllib.parse.quote(self.title_name, safe='') + '_input')))
     self.Msg_event = threading.Event()
-    self.Cmd_buffer = ["run", ('set_property', 'script-opts', 'osc-visibility=never'), ('observe_property', 1, 'time-pos'), ('observe_property', 2, 'pause'), ('observe_property', 3, 'duration'), ('observe_property', 4, 'mute'), ('observe_property', 5, 'volume'), ('set_property', 'title', '${?media-title:${media-title}}${!media-title:No file} - %s' % title_name)]
-    self.Msg_buffer = ["run"]
+    self.Cmd_buffer = ["run", ('set_property', 'script-opts', 'osc-visibility=never'), ('observe_property', 1, 'time-pos'), ('observe_property', 2, 'pause'), ('observe_property', 3, 'duration'), ('observe_property', 4, 'mute'), ('observe_property', 5, 'volume'), ('observe_property', 5, 'playlist-playing-pos'), ('set_property', 'title', '${?media-title:${media-title}}${!media-title:No file} - %s' % title_name)]
+    self.Msg_buffer = ['run']
     self.Read_pending = False
     kernel32.ResetEvent(self.lpOverlapped_r.contents.hEvent)
     self.Write_pending = False
@@ -385,7 +451,8 @@ class IPCmpvControler(threading.Thread):
           continue
         if 'event' in msg_dict:
           if msg_dict['event'] == "property-change":
-            if msg_dict.get('name','') == "duration":
+            name = msg_dict.get('name', '')
+            if name == "duration":
               if 'data' in msg_dict:
                 durat_sec = int(msg_dict['data'])
                 durat = '%d:%02d:%02d' % (durat_sec // 3600, (durat_sec % 3600) // 60, durat_sec % 60)
@@ -394,7 +461,7 @@ class IPCmpvControler(threading.Thread):
                   self.Player_events.append(('CurrentMediaDuration', durat))
                   self.Player_event_event.set()
                   self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('CurrentMediaDuration', durat), 1)
-            elif msg_dict.get('name','') == "time-pos":
+            elif name == "time-pos":
               if 'data' in msg_dict:
                 time_sec = int(msg_dict['data'])
                 time_pos = '%d:%02d:%02d' % (time_sec // 3600, (time_sec % 3600) // 60, time_sec % 60)
@@ -408,19 +475,19 @@ class IPCmpvControler(threading.Thread):
                 self.Player_events.append(('RelativeTimePosition', ""))
                 self.Player_event_event.set()
                 self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('RelativeTimePosition', ''), 2)
-            elif msg_dict.get('name','') == "mute":
+            elif name == "mute":
               if 'data' in msg_dict:
                 self.Player_mute = msg_dict['data']
                 self.Player_events.append(('Mute', self.Player_mute))
                 self.Player_event_event.set()
                 self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('Mute', self.Player_mute), 2)
-            elif msg_dict.get('name','') == "volume":
+            elif name == "volume":
               if 'data' in msg_dict:
                 self.Player_volume = int(float(msg_dict['data']))
                 self.Player_events.append(('Volume', self.Player_volume))
                 self.Player_event_event.set()
                 self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('Volume', self.Player_volume), 2)
-            elif msg_dict.get('name','') == "pause":
+            elif name == "pause":
               if msg_dict.get('data','') == True:
                 self.Player_paused = True
                 if self.Player_status == "PLAYING":
@@ -435,11 +502,16 @@ class IPCmpvControler(threading.Thread):
                   self.Player_events.append(('TransportState', "PLAYING"))
                   self.Player_event_event.set()
                   self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportState', "PLAYING"), 1)
+            elif name == "playlist-playing-pos":
+              if msg_dict.get('data', '') == 1:
+                self.Player_events.append(('Playlist', "1"))
+                self.Player_event_event.set()
+                self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('Playlist', "1"), 1)
           elif msg_dict['event'] == "start-file":
             self.Player_time_pos = ""
             self.Player_duration = ""
             self.Player_status = "TRANSITIONING"
-            self.Player_events.append(('TransportState', "TRANSITIONING"))
+            self.Player_events.append(('TransportState', "STARTING"))
             self.Player_event_event.set()
             self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportState', "TRANSITIONING"), 2)
           elif msg_dict['event'] == "end-file":
@@ -481,7 +553,7 @@ class IPCmpvControler(threading.Thread):
     self.logger.log('Lecteur: fermeture', 1)
     if self.Player_status != "STOPPED":
       self.Player_status = "STOPPED"
-      self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportState', "STOPPED"), 1)    
+      self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportState', "STOPPED"), 1)
       self.Player_events.append(('TransportState', "STOPPED"))
     self.Cmd_buffer[0] = "quit"
     self.Msg_buffer[0] = "quit"
@@ -500,7 +572,7 @@ class IPCmpvControler(threading.Thread):
         self.Pipe_handle = hnd
         break
     if kernel32.GetLastError() == 2:
-      self.logger.log('Lecteur - échec du lancement', 0)
+      self.logger.log(LSTRINGS['player_failure'], 0)
       return False
     self.incoming_msg_thread = threading.Thread(target=self.manage_incoming_msg)
     self.incoming_msg_thread.start()
@@ -593,7 +665,7 @@ class DLNAService:
 class DLNASearchServer(socketserver.UDPServer):
 
   allow_reuse_address = True
-  
+
   def __init__(self, *args, verbosity, **kwargs):
     self.logger = log_event(verbosity)
     super().__init__(*args, **kwargs)
@@ -611,7 +683,7 @@ class DLNASearchHandler(socketserver.DatagramRequestHandler):
       super().__init__(*args, **kwargs)
     except:
       pass
-  
+
   def handle(self):
     req = HTTPMessage(self.request)
     if req.method != 'M-SEARCH':
@@ -645,7 +717,7 @@ class DLNARequestServer(socketserver.ThreadingTCPServer):
   def __init__(self, *args, verbosity, **kwargs):
     self.logger = log_event(verbosity)
     super().__init__(*args, **kwargs)
-  
+
   def server_bind(self):
     self.conn_sockets = []
     try:
@@ -653,7 +725,7 @@ class DLNARequestServer(socketserver.ThreadingTCPServer):
     except:
       pass
     super().server_bind()
-    
+
   def process_request_thread(self, request, client_address):
     self.conn_sockets.append(request)
     self.logger.log('Connexion de %s:%s' % client_address, 2)
@@ -675,7 +747,7 @@ class DLNARequestHandler(socketserver.StreamRequestHandler):
       super().__init__(*args, **kwargs)
     except:
       pass
-  
+
   def handle(self):
     if not self.Renderer.is_request_manager_running:
       return
@@ -714,7 +786,7 @@ class DLNARequestHandler(socketserver.StreamRequestHandler):
       self.server.logger.log('Réception de la requête %s %s' % (req.method, req.path), 2)
       dict_scpd = {'/D_S': 'Device_SCPD', '/RC_S': 'RenderingControl_SCPD', '/CM_S': 'ConnectionManager_SCPD', '/AVT_S': 'AVTransport_SCPD'}
       if req.path.upper() in dict_scpd:
-        resp_body = eval('DLNARenderer.' + dict_scpd[req.path]).encode('UTF-8')
+        resp_body = (getattr(DLNARenderer, dict_scpd[req.path]) % (() if req.path != '/AVT_S' else ((DLNARenderer.AVTransport_SCPD_Gapless if self.Renderer.Gapless else ''),))).encode('utf-8')
         try:
           if req.method == 'GET':
             self.request.sendall(resp.replace('##type##', 'text/xml; charset="utf-8"').replace('##len##', str(len(resp_body))).encode('ISO-8859-1') + resp_body)
@@ -1000,7 +1072,7 @@ class DLNARequestHandler(socketserver.StreamRequestHandler):
             except:
               self.server.logger.log('Échec de la réponse à la requête POST %s-%s' % (serv, act), 1)
           elif res in ('401', '402', '701', '716'):
-            resp_body = eval('resp_err_ise' + res + '_body').encode('UTF-8')
+            resp_body = locals()['resp_err_ise%s_body' % '401'].encode('UTF-8')
             try:
               self.request.sendall(resp_err_ise.replace('##len##', str(len(resp_body))).encode('ISO-8859-1') + resp_body)
             except:
@@ -1152,7 +1224,7 @@ class DLNARenderer:
   <deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>
   <pnpx:X_compatibleId>MS_DigitalMediaDeviceClass_DMR_V001</pnpx:X_compatibleId>
   <pnpx:X_deviceCategory>MediaDevices</pnpx:X_deviceCategory>
-  <df:X_deviceCategory>Multimedia.DMR</df:X_deviceCategory>  
+  <df:X_deviceCategory>Multimedia.DMR</df:X_deviceCategory>
   <dlna:X_DLNADOC xmlns:dlna=\'urn:schemas-dlna-org:device-1-0\'>DMR-1.50</dlna:X_DLNADOC>
   <friendlyName>''' + html.escape(NAME) + '''</friendlyName>
   <manufacturer>PCigales</manufacturer>
@@ -1207,7 +1279,7 @@ class DLNARenderer:
     <minor>0</minor>
   </specVersion>
   <actionList>
-    <action>  
+    <action>
       <name>GetMute</name>
       <argumentList>
         <argument>
@@ -1227,7 +1299,7 @@ class DLNARenderer:
         </argument>
       </argumentList>
     </action>
-    <action> 
+    <action>
       <name>SetMute</name>
       <argumentList>
         <argument>
@@ -1247,7 +1319,7 @@ class DLNARenderer:
         </argument>
       </argumentList>
     </action>
-    <action> 
+    <action>
       <name>GetVolume</name>
       <argumentList>
         <argument>
@@ -1267,7 +1339,7 @@ class DLNARenderer:
         </argument>
       </argumentList>
     </action>
-    <action> 
+    <action>
       <name>SetVolume</name>
       <argumentList>
         <argument>
@@ -1289,16 +1361,16 @@ class DLNARenderer:
     </action>
   </actionList>
   <serviceStateTable>
-    <stateVariable sendEvents="yes"> 
-      <name>LastChange</name> 
+    <stateVariable sendEvents="yes">
+      <name>LastChange</name>
       <dataType>string</dataType>
     </stateVariable>
-    <stateVariable sendEvents="no"> 
-      <name>Mute</name>  
+    <stateVariable sendEvents="no">
+      <name>Mute</name>
       <dataType>boolean</dataType>
     </stateVariable>
-    <stateVariable sendEvents="no"> 
-      <name>Volume</name>  
+    <stateVariable sendEvents="no">
+      <name>Volume</name>
       <dataType>ui2</dataType>
       <allowedValueRange>
         <minimum>0</minimum>
@@ -1306,15 +1378,15 @@ class DLNARenderer:
         <step>1</step>
       </allowedValueRange>
     </stateVariable>
-    <stateVariable sendEvents="no"> 
-      <name>A_ARG_TYPE_Channel</name>  
+    <stateVariable sendEvents="no">
+      <name>A_ARG_TYPE_Channel</name>
       <dataType>string</dataType>
       <allowedValueList>
         <allowedValue>Master</allowedValue>
       </allowedValueList>
     </stateVariable>
-    <stateVariable sendEvents="no"> 
-      <name>A_ARG_TYPE_InstanceID</name>  
+    <stateVariable sendEvents="no">
+      <name>A_ARG_TYPE_InstanceID</name>
       <dataType>ui4</dataType>
     </stateVariable>
   </serviceStateTable>
@@ -1442,6 +1514,28 @@ class DLNARenderer:
     </stateVariable>
   </serviceStateTable>
 </scpd>'''
+  AVTransport_SCPD_Gapless = \
+  '''
+    <action>
+      <name>SetNextAVTransportURI</name>
+      <argumentList>
+        <argument>
+          <name>InstanceID</name>
+          <direction>in</direction>
+          <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable>
+        </argument>
+        <argument>
+          <name>NextURI</name>
+          <direction>in</direction>
+          <relatedStateVariable>NextAVTransportURI</relatedStateVariable>
+        </argument>
+        <argument>
+          <name>NextURIMetaData</name>
+          <direction>in</direction>
+          <relatedStateVariable>NextAVTransportURIMetaData</relatedStateVariable>
+        </argument>
+      </argumentList>
+    </action>'''
   AVTransport_SCPD = \
   '''<?xml version="1.0" encoding="utf-8"?>
 <scpd xmlns="urn:schemas-upnp-org:service-1-0">
@@ -1550,7 +1644,7 @@ class DLNARenderer:
           <relatedStateVariable>AVTransportURIMetaData</relatedStateVariable>
         </argument>
       </argumentList>
-    </action>
+    </action>%s
     <action>
       <name>GetTransportInfo</name>
       <argumentList>
@@ -2238,7 +2332,7 @@ class DLNARenderer:
   'rtsp-rtp-udp:*:video/x-ms-wmv:*,' \
   'rtsp-rtp-udp:*:audio/x-asf-pf:*'
 
-  def __init__(self, RendererIp='', RendererPort=8000, Minimize=False, FullScreen=False, JpegRotate=False, WMPDMCHideMKV=False, TrustControler=False, SearchSubtitles=False, verbosity=0):
+  def __init__(self, RendererIp='', RendererPort=8000, Minimize=False, FullScreen=False, JpegRotate=False, WMPDMCHideMKV=False, TrustControler=False, SearchSubtitles=False, gapless = False, verbosity=0):
     self.verbosity = verbosity
     self.logger = log_event(verbosity)
     if RendererIp:
@@ -2257,7 +2351,7 @@ class DLNARenderer:
             self.ip = socket.gethostbyname(socket.getfqdn())
           except:
             self.ip = ''
-            self.logger.log('Échec de la récupération de l\'addresse ip de l\'hôte', 0)
+            self.logger.log(LSTRINGS['ip_failure'], 0)
     self.port = RendererPort
     self.Minimize = Minimize
     self.FullScreen = FullScreen
@@ -2266,7 +2360,11 @@ class DLNARenderer:
     self.WMPDMCHideMKV = WMPDMCHideMKV
     self.TrustControler = TrustControler
     self.SearchSubtitles = SearchSubtitles
+    self.Gapless = gapless
     self.IPCmpvControlerInstance = IPCmpvControler(title_name=NAME + ':%s' % RendererPort , verbosity=verbosity)
+    self.send_command(('set_property', 'force-media-title', " "))
+    if gapless:
+      self.send_command(('set_property', 'access-references', False))
     self.is_search_manager_running = None
     self.is_request_manager_running = None
     self.is_events_manager_running = None
@@ -2300,7 +2398,7 @@ class DLNARenderer:
       service.ControlURL = urllib.parse.urljoin(self.BaseURL, _XMLGetNodeText(node.getElementsByTagName('controlURL')[0]))
       service.SubscrEventURL = urllib.parse.urljoin(self.BaseURL, _XMLGetNodeText(node.getElementsByTagName('eventSubURL')[0]))
       service.DescURL = urllib.parse.urljoin(self.BaseURL, _XMLGetNodeText(node.getElementsByTagName('SCPDURL')[0]))
-      root_s_xml = minidom.parseString(eval('DLNARenderer.%s_SCPD' % service.Id[23:]))
+      root_s_xml = minidom.parseString((getattr(DLNARenderer, '%s_SCPD' % service.Id[23:])) % (() if service.Id[23:] != 'AVTransport' else ((DLNARenderer.AVTransport_SCPD_Gapless if self.Gapless else ''),)))
       for node_s in root_s_xml.getElementsByTagName('action'):
         action = DLNAAction()
         action.Name = _XMLGetNodeText(node_s.getElementsByTagName('name')[0])
@@ -2343,11 +2441,13 @@ class DLNARenderer:
     self.Mute = "0"
     self.Volume = "0"
     self.AVTransportURI = ""
-    self.AVTransportSubURI = ""
     self.AVTransportURIMetaData = ""
     self.RelativeTimePosition = "0:00:00"
     self.CurrentMediaDuration = "0:00:00"
-    self.Rotation = 0
+    self.LoadfileOptions = ""
+    self.NextAVTransportURI = ""
+    self.NextAVTransportURIMetaData = ""
+    self.NextLoadfileOptions = ""
 
   def send_advertisement(self, alive):
     msg = 'NOTIFY * HTTP/1.1\r\n' \
@@ -2395,7 +2495,7 @@ class DLNARenderer:
       self.logger.log('Démarrage de l\'écoute des messages de recherche de renderer', 1)
       manager_thread = threading.Thread(target=self._start_search_manager)
       manager_thread.start()
-  
+
   def stop_search_management(self):
     if self.is_search_manager_running:
       self.logger.log('Fin de l\'écoute des messages de recherche de renderer', 1)
@@ -2410,7 +2510,7 @@ class DLNARenderer:
       while self.IPCmpvControlerInstance.Pipe_handle == None and self.IPCmpvControlerInstance.Cmd_buffer[0] != "quit":
         time.sleep(0.1)
       self.mpv_shutdown_event.set()
-      self.logger.log('Échec du démarrage de l\'écoute des requêtes à l\'adresse %s:%s' % (self.ip, self.port), 0)
+      self.logger.log(LSTRINGS['request_failure'] % (self.ip, self.port), 0)
     finally:
       self.is_request_manager_running = None
 
@@ -2432,7 +2532,7 @@ class DLNARenderer:
       self.logger.log('Démarrage de l\'écoute des requêtes à l\'adresse %s:%s' % (self.ip, self.port), 1)
       manager_thread = threading.Thread(target=self._start_request_manager)
       manager_thread.start()
-  
+
   def stop_request_management(self):
     if self.is_request_manager_running:
       self.logger.log('Fin de l\'écoute des requêtes', 1)
@@ -2461,7 +2561,7 @@ class DLNARenderer:
           self.CurrentMediaDuration = event[1] if event[1] else "0:00:00"
           self.events_add('AVTransport', (('CurrentMediaDuration', self.CurrentMediaDuration),('CurrentTrackDuration', self.CurrentMediaDuration)))
         elif event[0] == 'TransportState':
-          self.TransportState = event[1].upper()
+          self.TransportState = event[1].upper().replace("STARTING", "TRANSITIONING")
           if self.TransportState == "STOPPED":
             self.full_screen = self.FullScreen
             self.send_command(('set_property', 'script-opts', 'osc-visibility=never'))
@@ -2474,10 +2574,21 @@ class DLNARenderer:
             if self.full_screen:
               self.full_screen = False
               self.send_command(('set_property', 'fullscreen', True))
-          self.events_add('AVTransport', (('TransportState', self.TransportState), ('CurrentTransportActions', {'TRANSITIONING': "Stop", 'STOPPED': "Play,Seek",'PAUSED_PLAYBACK': "Play,Stop,Seek" ,'PLAYING': "Pause,Stop,Seek"}.get(self.TransportState, ""))))
+          if not self.Gapless or event[1].upper() != "STARTING" or not self.NextAVTransportURI:
+            self.events_add('AVTransport', (('TransportState', self.TransportState), ('CurrentTransportActions', {'TRANSITIONING': "Stop", 'STOPPED': "Play,Seek",'PAUSED_PLAYBACK': "Play,Stop,Seek" ,'PLAYING': "Pause,Stop,Seek"}.get(self.TransportState, ""))))
         elif event[0] == 'TransportStatus' and event[1].upper() == "ERROR_OCCURRED":
           self.events_add('AVTransport', (('TransportStatus', "ERROR_OCCURRED"),))
           self.events_add('AVTransport', (('TransportStatus', "OK"),))
+        elif self.Gapless and event[0] == 'Playlist' and event[1] == '1':
+          self.events_add('AVTransport', (('TransportState', "PLAYING"), ('CurrentTransportActions',  "Pause,Stop,Seek")))
+          self.send_command(('playlist-remove', 0))
+          self.AVTransportURI = self.NextAVTransportURI
+          self.AVTransportURIMetaData = self.NextAVTransportURIMetaData
+          self.LoadfileOptions = self.NextLoadfileOptions
+          self.NextAVTransportURI = ""
+          self.NextAVTransportURIMetaData = ""
+          self.NextLoadfileOptions = ""
+          self.events_add('AVTransport', (('AVTransportURI', self.AVTransportURI), ('AVTransportURIMetaData', self.AVTransportURIMetaData), ('CurrentTrackMetaData', self.AVTransportURIMetaData), ('CurrentTrackURI', self.AVTransportURI), ('NextAVTransportURI', self.NextAVTransportURI), ('NextAVTransportURIMetaData', self.NextAVTransportURIMetaData)))
         elif event[0] == 'Mute':
           self.Mute = "1" if event[1] else "0"
           self.events_add('RenderingControl', (('Mute channel="Master"', self.Mute),))
@@ -2535,10 +2646,19 @@ class DLNARenderer:
         out_args['Sink'] = DLNARenderer.Sink
       else:
         out_args['Sink'] = DLNARenderer.Sink.replace(',http-get:*:video/x-matroska:*','')
-    elif acti.lower() == 'SetAVTransportURI'.lower():
-      prev_transp_state = self.TransportState
-      self.TransportState = "TRANSITIONING"
-      self.events_add('AVTransport', (('TransportState', "TRANSITIONING"), ('CurrentTransportActions', "Stop")))
+    elif acti.lower() == 'SetAVTransportURI'.lower() or (acti.lower() == 'SetNextAVTransportURI'.lower() and self.Gapless):
+      is_next = acti.lower() == 'SetNextAVTransportURI'.lower()
+      if is_next:
+        if self.NextAVTransportURI:
+          self.send_command(('playlist-remove', 1))
+      else:
+        prev_transp_state = self.TransportState
+        self.TransportState = "TRANSITIONING"
+        self.events_add('AVTransport', (('TransportState', "TRANSITIONING"), ('CurrentTransportActions', "Stop")))
+        if self.NextAVTransportURI:
+          self.NextAVTransportURI = ""
+          self.NextAVTransportURIMetaData = ""
+          self.NextLoadfileOptions = ""
       uri = None
       protocol_info = ''
       title = ''
@@ -2547,7 +2667,7 @@ class DLNARenderer:
       caption_info = ''
       caption_type = ''
       try:
-        didl_root = minidom.parseString(in_args['CurrentURIMetaData'.lower()])
+        didl_root = minidom.parseString(in_args['NextURIMetaData'.lower() if is_next else 'CurrentURIMetaData'.lower()])
         node = None
         for ch_node in didl_root.documentElement.childNodes:
           if ch_node.nodeType == ch_node.ELEMENT_NODE:
@@ -2569,7 +2689,7 @@ class DLNARenderer:
                       if att[1].upper().partition('DLNA.ORG_CI=')[2].split(';')[0] == 0:
                         uri = _XMLGetNodeText(ch_node)
                         protocol_info = att[1]
-                  if not s_protocol_info and in_args['CurrentURI'.lower()] == _XMLGetNodeText(ch_node):
+                  if not s_protocol_info and in_args['NextURI'.lower() if is_next else 'CurrentURI'.lower()] == _XMLGetNodeText(ch_node):
                     s_protocol_info = att[1]
                 elif not caption_info and 'subtitlefileuri' in att[0].lower():
                   caption_info = att[1]
@@ -2581,7 +2701,7 @@ class DLNARenderer:
       except:
         uri = None
       if not uri:
-        uri = in_args['CurrentURI'.lower()]
+        uri = in_args['NextURI'.lower() if is_next else 'CurrentURI'.lower()]
         protocol_info = s_protocol_info
       rep = None
       server = ''
@@ -2601,77 +2721,93 @@ class DLNARenderer:
         else:
           rep = os.path.isfile(uri)
       if not rep:
-        self.events_add('AVTransport', (('TransportStatus', "ERROR_OCCURRED"),))
-        self.events_add('AVTransport', (('TransportStatus', "OK"),))
-        self.ActionsProcessed += 1
-        self.TransportState = prev_transp_state
-        self.IPCmpvControlerInstance.Player_events.append(('TransportState', prev_transp_state))
-        self.IPCmpvControlerInstance.Player_event_event.set()
+        if not is_next:
+          self.events_add('AVTransport', (('TransportStatus', "ERROR_OCCURRED"),))
+          self.events_add('AVTransport', (('TransportStatus', "OK"),))
+          self.ActionsProcessed += 1
+          self.TransportState = prev_transp_state
+          self.IPCmpvControlerInstance.Player_events.append(('TransportState', prev_transp_state))
+          self.IPCmpvControlerInstance.Player_event_event.set()
         return '716', None
-      self.AVTransportURI = uri
-      if rep == True:
-        self.AVTransportSubURI = caption_info
+      title = title or ' '
+      load_opt = "force-media-title=%%%d%%%s" % (len(title.encode('utf-8')), title)
+      if is_next:
+        self.NextAVTransportURI = uri
       else:
-        self.AVTransportSubURI = rep.getheader('CaptionInfo.sec', caption_info)
+        self.AVTransportURI = uri
+      if rep == True:
+        sub_uri = caption_info
+      else:
+        sub_uri = rep.getheader('CaptionInfo.sec', caption_info)
         rep.close()
       rep = None
-      if self.AVTransportSubURI and not self.TrustControler:
+      if sub_uri and not self.TrustControler:
         if r'://' in uri:
-          rep = _open_url(self.AVTransportSubURI, method='HEAD')
+          rep = _open_url(sub_uri, method='HEAD')
         else:
-          rep = os.path.isfile(self.AVTransportSubURI)
+          rep = os.path.isfile(sub_uri)
         if not rep:
-          self.AVTransportSubURI = ""
+          sub_uri = ''
         elif rep != True:
           rep.close()
-      if self.SearchSubtitles and 'object.item.videoItem'.lower() in upnp_class.lower() and not self.AVTransportSubURI and r'://' in uri and not 'Microsoft-HTTPAPI'.lower() in server.lower() and not "BubbleUPnP".lower() in server.lower():
+      if self.SearchSubtitles and 'object.item.videoItem'.lower() in upnp_class.lower() and not sub_uri and r'://' in uri and not 'Microsoft-HTTPAPI'.lower() in server.lower() and not "BubbleUPnP".lower() in server.lower():
         uri_name = uri.rsplit('.', 1)[0]
         for sub_ext in ('.ttxt', '.txt', '.smi', '.srt', '.sub', '.ssa', '.ass'):
           rep = _open_url(uri_name + sub_ext, method='HEAD', timeout=2)
           if rep:
-            self.AVTransportSubURI = uri_name + sub_ext
+            sub_uri = uri_name + sub_ext
             caption_type = sub_ext
             rep.close()
             break
-      self.Rotation = 0
+      rota = 0
       if 'object.item.imageItem'.lower() in upnp_class.lower() and self.JpegRotate:
-        self.Rotation = {'upper-left': 0, 'lower-right': 180, 'upper-right': 90, 'lower-left': 270}.get(_jpeg_exif_orientation(self.AVTransportURI), 0)
-      self.AVTransportURIMetaData = '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:dlna="urn:schemas-dlna-org:metadata-1-0/" xmlns:sec="http://www.sec.co.kr/"><item><dc:title>%s</dc:title><upnp:class>%s</upnp:class><res protocolInfo="%s">%s</res>%s</item></DIDL-Lite>' % (html.escape(title), upnp_class, html.escape(protocol_info), html.escape(uri), '<sec:CaptionInfoEx sec:type="%s">%s</sec:CaptionInfoEx>' %(html.escape(caption_type), html.escape(self.AVTransportSubURI)) if self.AVTransportSubURI else '')
-      self.events_add('AVTransport', (('AVTransportURI', self.AVTransportURI), ('AVTransportURIMetaData', self.AVTransportURIMetaData), ('CurrentTrackMetaData', self.AVTransportURIMetaData), ('CurrentTrackURI', self.AVTransportURI)))
-      if prev_transp_state == "TRANSITIONING":
-        self.send_command(('stop',))
-      if 'MDEServer'.lower() in self.AVTransportURI.lower():
-        if not 'DLNA.ORG_CI' in self.AVTransportURIMetaData or 'DLNA.ORG_CI=0' in self.AVTransportURIMetaData:
-          self.send_command(('set_property', 'stream-lavf-o', {}))
+        rota = {'upper-left': 0, 'lower-right': 180, 'upper-right': 90, 'lower-left': 270}.get(_jpeg_exif_orientation(self.AVTransportURI), 0)
+      if rota:
+        load_opt += ",video-rotate=%s" % rota
+      uri_metadata = '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:dlna="urn:schemas-dlna-org:metadata-1-0/" xmlns:sec="http://www.sec.co.kr/"><item><dc:title>%s</dc:title><upnp:class>%s</upnp:class><res protocolInfo="%s">%s</res>%s</item></DIDL-Lite>' % (html.escape(title), upnp_class, html.escape(protocol_info), html.escape(uri), '<sec:CaptionInfoEx sec:type="%s">%s</sec:CaptionInfoEx>' %(html.escape(caption_type), html.escape(sub_uri)) if sub_uri else '')
+      if is_next:
+        self.NextAVTransportURIMetaData = uri_metadata
+      else:
+        self.AVTransportURIMetaData = uri_metadata
+      if is_next:
+        self.events_add('AVTransport', (('NextAVTransportURI', self.NextAVTransportURI), ('NextAVTransportURIMetaData', self.NextAVTransportURIMetaData)))
+      else:
+        self.events_add('AVTransport', (('AVTransportURI', self.AVTransportURI), ('AVTransportURIMetaData', self.AVTransportURIMetaData), ('CurrentTrackMetaData', self.AVTransportURIMetaData), ('CurrentTrackURI', self.AVTransportURI)))
+      if 'MDEServer'.lower() in uri.lower():
+        if 'DLNA.ORG_CI' in uri_metadata and not 'DLNA.ORG_CI=0' in uri_metadata:
+          load_opt += ",stream-lavf-o=seekable=0"
+      elif not accept_range:
+        load_opt += ",stream-lavf-o=seekable=0"
+      if sub_uri:
+        load_opt += ",sub-files=%%%d%%%s"% (len(sub_uri.encode('utf-8')), sub_uri)
+      if not is_next:
+        self.LoadfileOptions = load_opt
+        if prev_transp_state == "TRANSITIONING":
+          self.send_command(('stop',))
+        if self.IPCmpvControlerInstance.Player_status.upper() in ("NO_MEDIA_PRESENT", "STOPPED") and prev_transp_state in ("NO_MEDIA_PRESENT", "STOPPED"):
+          self.TransportState = "STOPPED"
+          self.RelativeTimePosition = "0:00:00"
+          self.CurrentMediaDuration = "0:00:00"
+          self.IPCmpvControlerInstance.Player_events.append(('TransportState', "STOPPED"))
+          self.events_add('AVTransport', (('CurrentMediaDuration', "0:00:00"), ('CurrentTrackDuration', "0:00:00")))
+          self.IPCmpvControlerInstance.Player_event_event.set()
         else:
-          self.send_command(('set_property', 'stream-lavf-o', {"seekable":"0"}))
+          self.send_command(('loadfile', self.AVTransportURI, 'replace', self.LoadfileOptions))
+          self.send_command(('set_property', 'pause', False))
+        self.logger.log(LSTRINGS['current_content'] % (LSTRINGS['video'] if 'video' in upnp_class.lower() else LSTRINGS['audio'] if 'audio' in upnp_class.lower() else LSTRINGS['image'] if 'image' in upnp_class.lower() else '', title, self.AVTransportURI + ((' + ' + sub_uri) if sub_uri else '')), 0)
+        if rota != 0:
+          self.logger.log('Rotation du contenu de %s°' % rota, 2)
       else:
-        self.send_command(('set_property', 'stream-lavf-o', {} if accept_range else {"seekable":"0"}))
-      self.send_command(('set_property', 'force-media-title', title if title else ''))
-      if self.IPCmpvControlerInstance.Player_status.upper() in ("NO_MEDIA_PRESENT", "STOPPED") and prev_transp_state in ("NO_MEDIA_PRESENT", "STOPPED"):
-        self.TransportState = "STOPPED"
-        self.RelativeTimePosition = "0:00:00"
-        self.CurrentMediaDuration = "0:00:00"
-        self.IPCmpvControlerInstance.Player_events.append(('TransportState', "STOPPED"))
-        self.events_add('AVTransport', (('CurrentMediaDuration', "0:00:00"), ('CurrentTrackDuration', "0:00:00")))
-        self.IPCmpvControlerInstance.Player_event_event.set()
-      else:
-        self.send_command(('set_property', 'video-rotate', self.Rotation))
-        self.send_command(('loadfile', self.AVTransportURI, 'replace'))
-        if self.AVTransportSubURI:
-          self.send_command(('sub-add', self.AVTransportSubURI, 'select'))
-        self.send_command(('set_property', 'pause', False))
-      self.logger.log('Contenu en cours: %s | %s | %s' % ('vidéo' if 'video' in upnp_class.lower() else 'audio' if 'audio' in upnp_class.lower() else 'image' if 'image' in upnp_class.lower() else '', title, self.AVTransportURI + ((' + ' + self.AVTransportSubURI) if self.AVTransportSubURI else '')), 0)
-      if self.Rotation != 0:
-        self.logger.log('Rotation du contenu de %s°' % self.Rotation, 2)
+        self.NextLoadfileOptions = load_opt
+        self.send_command(('loadfile', self.NextAVTransportURI, 'append', self.NextLoadfileOptions))
+        self.logger.log('Prochain contenu: %s | %s | %s' % ('vidéo' if 'video' in upnp_class.lower() else 'audio' if 'audio' in upnp_class.lower() else 'image' if 'image' in upnp_class.lower() else '', title, self.NextAVTransportURI + ((' + ' + sub_uri) if sub_uri else '')), 1)
+        if rota != 0:
+          self.logger.log('Rotation du prochain contenu de %s°' % rota, 2)
     elif acti.lower() == 'Play'.lower():
       if self.TransportState == "NO_MEDIA_PRESENT":
         return '701', None
       if self.IPCmpvControlerInstance.Player_status.upper() in ("STOPPED", "NO_MEDIA_PRESENT"):
-        self.send_command(('set_property', 'video-rotate', self.Rotation))
-        self.send_command(('loadfile', self.AVTransportURI, 'replace'))
-        if self.AVTransportSubURI:
-          self.send_command(('sub-add', self.AVTransportSubURI, 'select'))
+        self.send_command(('loadfile', self.AVTransportURI, 'replace', self.LoadfileOptions))
         self.send_command(('set_property', 'script-opts', 'osc-visibility=auto'))
         if self.Minimize:
           self.send_command(('set_property', 'window-minimized', False))
@@ -2709,8 +2845,8 @@ class DLNARenderer:
       out_args['MediaDuration'] = self.CurrentMediaDuration
       out_args['CurrentURI'] = self.AVTransportURI
       out_args['CurrentURIMetaData'] = self.AVTransportURIMetaData
-      out_args['NextURI'] = ""
-      out_args['NextURIMetaData'] = ""
+      out_args['NextURI'] = self.NextAVTransportURI
+      out_args['NextURIMetaData'] = self.NextAVTransportURIMetaData
       out_args['PlayMedium'] = "NETWORK,NONE"
       out_args['RecordMedium'] = "NOT_IMPLEMENTED"
       out_args['WriteStatus'] = "NOT_IMPLEMENTED"
@@ -2780,32 +2916,33 @@ class DLNARenderer:
 if __name__ == '__main__':
 
   print('DLNAmpvRenderer v1.1.8 (https://github.com/PCigales/DLNAmpvRenderer)    Copyright © 2022 PCigales')
-  print('Ce programme est sous licence copyleft GNU GPLv3 (voir https://www.gnu.org/licenses).')
+  print(LSTRINGS['license'])
   print('');
 
   formatter = lambda prog: argparse.HelpFormatter(prog, max_help_position=50, width=119)
   CustomArgumentParser = partial(argparse.ArgumentParser, formatter_class=formatter)
   parser = CustomArgumentParser()
-  parser.add_argument('--bind', '-b', metavar='RENDERER_TCP_IP', help='adresse IP du renderer [auto-sélectionnée par défaut]', default='')
-  parser.add_argument('--port', '-p', metavar='RENDERER_TCP_PORT', help='port TCP du renderer [8000 par défaut]', type=int, default=8000)
-  parser.add_argument('--name', '-n', metavar='RENDERER_NAME', help='nom du renderer [DLNAmpvRenderer par défaut]', default='DLNAmpvRenderer')
-  parser.add_argument('--minimize', '-m', help='passage en mode minimisé quand inactif [désactivé par défaut]', action='store_true')
-  parser.add_argument('--fullscreen', '-f', help='passage en mode plein écran à chaque session [désactivé par défaut]', action='store_true')
-  parser.add_argument('--rotate_jpeg', '-r', help='rotation automatique des images jpeg [désactivé par défaut, était nécessaire avec les anciennes versions de mpv]', action='store_true')
-  parser.add_argument('--wmpdmc_no_mkv', '-w', help='masque la prise en charge du format matroska à WMPDMC pour permettre le contrôle distant [désactivé par défaut]', action='store_true')
-  parser.add_argument('--trust_controler', '-t', help='désactive la vérification des adresses avant leur transmission à mpv [désactivé par défaut]', action='store_true')
-  parser.add_argument('--search_subtitles', '-s', help='active la recherche systématique de sous-titres [désactivé par défaut]', action='store_true')
-  parser.add_argument('--verbosity', '-v', metavar='VERBOSE', help='niveau de verbosité de 0 à 2 [0 par défaut]', type=int, choices=[0, 1, 2], default=0)
+  parser.add_argument('--bind', '-b', metavar='RENDERER_TCP_IP', help=LSTRINGS['parser_ip'], default='')
+  parser.add_argument('--port', '-p', metavar='RENDERER_TCP_PORT', help=LSTRINGS['parser_port'], type=int, default=8000)
+  parser.add_argument('--name', '-n', metavar='RENDERER_NAME', help=LSTRINGS['parser_name'], default='DLNAmpvRenderer')
+  parser.add_argument('--minimize', '-m', help=LSTRINGS['parser_minimized'], action='store_true')
+  parser.add_argument('--fullscreen', '-f', help=LSTRINGS['parser_fullscreen'], action='store_true')
+  parser.add_argument('--rotate_jpeg', '-r', help=LSTRINGS['parser_rotation'], action='store_true')
+  parser.add_argument('--wmpdmc_no_mkv', '-w', help=LSTRINGS['parser_mkv'], action='store_true')
+  parser.add_argument('--trust_controler', '-t', help=LSTRINGS['parser_trust'], action='store_true')
+  parser.add_argument('--search_subtitles', '-s', help=LSTRINGS['parser_subtitles'], action='store_true')
+  parser.add_argument('--gapless', '-g', help=LSTRINGS['parser_gapless'], action='store_true')
+  parser.add_argument('--verbosity', '-v', metavar='VERBOSE', help=LSTRINGS['parser_verbosity'], type=int, choices=[0, 1, 2], default=0)
 
   args = parser.parse_args()
   if args.name.strip() and args.name != 'DLNAmpvRenderer':
     NAME = args.name
     UDN = 'uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, args.name))
     DLNARenderer.Device_SCPD = DLNARenderer.Device_SCPD.replace('DLNAmpvRenderer', html.escape(NAME)).replace('uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, 'DLNAmpvRenderer')), UDN)
-  Renderer = DLNARenderer(args.bind, args.port, args.minimize, args.fullscreen, args.rotate_jpeg, args.wmpdmc_no_mkv, args.trust_controler, args.search_subtitles, args.verbosity)
-  print('Appuyez sur "S" ou fermez mpv pour stopper')
-  print('Appuyez sur "M" pour activer/désactiver le passage en mode minimisé quand inactif - mode actuel: %s' % ('activé' if Renderer.Minimize else 'désactivé'))
-  print('Appuyez sur "F" pour activer/désactiver le passage en mode plein écran à chaque session - mode actuel: %s' % ('activé' if Renderer.FullScreen else 'désactivé'))
+  Renderer = DLNARenderer(args.bind, args.port, args.minimize, args.fullscreen, args.rotate_jpeg, args.wmpdmc_no_mkv, args.trust_controler, args.search_subtitles, args.gapless, args.verbosity)
+  print(LSTRINGS['keyboard_s'])
+  print(LSTRINGS['keyboard_m'] % (LSTRINGS['enabled'] if Renderer.Minimize else LSTRINGS['disabled']))
+  print(LSTRINGS['keyboard_f'] % (LSTRINGS['enabled'] if Renderer.FullScreen else LSTRINGS['disabled']))
   Renderer.start()
   k = b''
   while not Renderer.mpv_shutdown_event.is_set() and k != b'S':
@@ -2821,11 +2958,11 @@ if __name__ == '__main__':
         Renderer.Minimize = not Renderer.Minimize
         if Renderer.TransportState in ("NO_MEDIA_PRESENT", "STOPPED"):
           Renderer.send_command(('set_property', 'window-minimized', Renderer.Minimize))
-        print('Passage en mode minimisé quand inactif: %s' % ('activé' if Renderer.Minimize else 'désactivé'))
+        print(LSTRINGS['mode_m'] % (LSTRINGS['enabled'] if Renderer.Minimize else LSTRINGS['disabled']))
       elif k == b'F':
         Renderer.FullScreen = not Renderer.FullScreen
         Renderer.full_screen = Renderer.FullScreen
-        print('Passage en mode plein écran à chaque session: %s' % ('activé' if Renderer.FullScreen else 'désactivé'))
+        print(LSTRINGS['mode_f'] % (LSTRINGS['enabled'] if Renderer.FullScreen else LSTRINGS['disabled']))
     if k != b'S':
       Renderer.mpv_shutdown_event.wait(0.5)
   Renderer.stop()
