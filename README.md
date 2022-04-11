@@ -4,7 +4,7 @@ A script in Python 3 to turn mpv into a DLNA / UPnP renderer
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses/.
 
-DLNAmpvRenderer is an application written in Python 3 designed as a wrapper for mpv to use the player as a DLNA/UPnP renderer, on a computer running under Windows. The script does not need any other package, only the presence of an executable of mpv is required. The application has been tested with a few DLNA controlers (Windows Media Player Digital Media Controller, Bubble UPnP, UPnPlay, DLNAPlayOn) but should work with any DLNA compliant controler. Subtitles management is enabled through the DIDL description ('subtitlefileuri' or 'captioninfo'/'captioninfoex' tags) or the use of a 'captioninfo.sec' header in the response to the HEAD/GET request for the content to be played. Several instances can run in parallel provided they use different ports and names.
+DLNAmpvRenderer is an application written in Python 3 designed as a wrapper for mpv to use the player as a DLNA/UPnP renderer, on a computer running under Windows. The script does not need any other package, only the presence of an executable of mpv is required. The application has been tested with a few DLNA controlers (Windows Media Player Digital Media Controller, Bubble UPnP, UPnPlay, DLNAPlayOn) but should work with any DLNA compliant controler. Subtitles management is enabled through the DIDL description ('subtitlefileuri' or 'captioninfo'/'captioninfoex' tags) or the use of a 'captioninfo.sec' header in the response to the HEAD/GET request for the content to be played. Gapless playback has been tested with Bubble UPnP. Several instances can run in parallel provided they use different ports and names.
 
 To install the application:
 
@@ -18,7 +18,7 @@ To run the application:
 
  DLNAmpvRenderer -h to display the complete syntax of command line and abbreviated commands
     
- DLNAmpvRenderer [-h] [--bind RENDERER_TCP_IP] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--rotate_jpeg] [--wmpdmc_no_mkv] [--trust_controler] [--search_subtitles] [--verbosity VERBOSE]  
+ DLNAmpvRenderer [-h] [--bind RENDERER_TCP_IP] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--rotate_jpeg] [--wmpdmc_no_mkv] [--trust_controler] [--search_subtitles] [--gapless] [--verbosity VERBOSE]  
     
   --bind RENDERER_TCP_IP: the ip address used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests (to set it manually if the script does not manage to self-determine the ip address of the host or to select a specific network interface)    
   --port RENDERER_TCP_PORT: the port used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests    
@@ -29,6 +29,7 @@ To run the application:
   --wmpdmc_no_mkv: when set, Windows Media Player Digital Media Controller will transcode 'mkv' (matroska) files to 'mpegts' before streaming the content, allowing remote control of the playback, otherwise, the 'mkv' file will be streamed as it is, and the seekbar will probably be inactive in WMPDMC (but available in mpv)    
   --trust_controler: when set, the URL of the content sent to the renderer is not checked before being passed to mpv, which will not work if the server throws errors at range requests (as some DLNA servers do)    
   --search_subtitles: when set, always requests subtitles, trying different extensions if no subtitle uri is provided by the controler or the server (may slow down the process)     
+  --gapless: when set, enables gapless playback (but compatibility with controlers supporting this feature is not ensured as it is not standardized) but disables playlist loading in mpv     
   --verbosity VERBOSE: for troubleshooting purposes, from 0 (default) to 2  
 
  Example: DLNAmpvRenderer -p 9100 -m -f -r
