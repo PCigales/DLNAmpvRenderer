@@ -2648,17 +2648,15 @@ class DLNARenderer:
         out_args['Sink'] = DLNARenderer.Sink.replace(',http-get:*:video/x-matroska:*','')
     elif acti.lower() == 'SetAVTransportURI'.lower() or (acti.lower() == 'SetNextAVTransportURI'.lower() and self.Gapless):
       is_next = acti.lower() == 'SetNextAVTransportURI'.lower()
-      if is_next:
-        if self.NextAVTransportURI:
-          self.send_command(('playlist-remove', 1))
-      else:
+      if self.NextAVTransportURI:
+        self.send_command(('playlist-remove', 1))
+        self.NextAVTransportURI = ""
+        self.NextAVTransportURIMetaData = ""
+        self.NextLoadfileOptions = ""
+      if not is_next:
         prev_transp_state = self.TransportState
         self.TransportState = "TRANSITIONING"
         self.events_add('AVTransport', (('TransportState', "TRANSITIONING"), ('CurrentTransportActions', "Stop")))
-        if self.NextAVTransportURI:
-          self.NextAVTransportURI = ""
-          self.NextAVTransportURIMetaData = ""
-          self.NextLoadfileOptions = ""
       uri = None
       protocol_info = ''
       title = ''
@@ -2724,7 +2722,6 @@ class DLNARenderer:
         if not is_next:
           self.events_add('AVTransport', (('TransportStatus', "ERROR_OCCURRED"),))
           self.events_add('AVTransport', (('TransportStatus', "OK"),))
-          self.ActionsProcessed += 1
           self.TransportState = prev_transp_state
           self.IPCmpvControlerInstance.Player_events.append(('TransportState', prev_transp_state))
           self.IPCmpvControlerInstance.Player_event_event.set()
