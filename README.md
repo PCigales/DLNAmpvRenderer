@@ -29,7 +29,7 @@ To run the application:
   --wmpdmc_no_mkv: when set, Windows Media Player Digital Media Controller will transcode 'mkv' (matroska) files to 'mpegts' before streaming the content, allowing remote control of the playback, otherwise, the 'mkv' file will be streamed as it is, and the seekbar will probably be inactive in WMPDMC (but available in mpv)    
   --trust_controler: when set, the URL of the content sent to the renderer is not checked before being passed to mpv, which will not work if the server throws errors at range requests (as some DLNA servers do)    
   --search_subtitles: when set, always requests subtitles, trying different extensions if no subtitle uri is provided by the controler or the server (may slow down the process)     
-  --gapless: when set, enables gapless playback (but compatibility with controlers supporting this feature is not ensured as it is not standardized) but disables playlist loading in mpv     
+  --gapless: when set, enables gapless playback (but compatibility with controlers supporting this feature is not ensured as it is not standardized) but disables playlist loading in mpv - if the access to the media contents has latency, it may be necessary to use the "prefetch-playlist" option (by adding "--prefetch-playlist=yes" to mpv.bat or "prefetch-list=yes" in mpv.conf as explained below)     
   --verbosity VERBOSE: for troubleshooting purposes, from 0 (default) to 2  
 
  Example: DLNAmpvRenderer -p 9100 -m -f -r
