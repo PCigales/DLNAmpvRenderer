@@ -37,7 +37,7 @@ FR_STRINGS = {
   'parser_mkv': 'masque la prise en charge du format matroska à WMPDMC pour permettre le contrôle distant [désactivé par défaut]',
   'parser_trust': 'désactive la vérification des adresses avant leur transmission à mpv [désactivé par défaut]',
   'parser_subtitles': 'active la recherche systématique de sous-titres [désactivé par défaut]',
-  'parser_gapless': 'active la lecture sans blanc (sous réserve de compatibilité avec le contrôleur) [désactivé par défaut]',
+  'parser_gapless': 'active la lecture sans blanc (sous réserve de compatibilité avec le contrôleur), avec préchargement audio (pourrait faire dysfonctionner mpv) si "p" mentionné [désactivé par défaut]',
   'parser_verbosity': 'niveau de verbosité de 0 à 2 [0 par défaut]',
   'keyboard_s': 'Appuyez sur "S" ou fermez mpv pour quitter',
   'enabled': 'activé',
@@ -65,7 +65,7 @@ EN_STRINGS = {
   'parser_mkv': 'mask support of matroska format to WMPDMC to allow the remote control [disabled by default]',
   'parser_trust': 'disable the checking of the addresses before their transmission to mpv [disabled by default]',
   'parser_subtitles': 'enable systematic search for subtitles [disabled by default]',
-  'parser_gapless': 'enable gapless playback (subject to controller compatibility) [disabled by default]',
+  'parser_gapless': 'enable gapless playback (subject to controller compatibility), with audio prefetch (might make mpv malfunction) if "p" mentioned [disabled by default]',
   'parser_verbosity': 'level of verbosity from 0 to 2 [0 by default]',
   'keyboard_s': 'Press "S" or close mpv to exit',
   'enabled': 'enabled',
@@ -2365,6 +2365,8 @@ class DLNARenderer:
     self.send_command(('set_property', 'force-media-title', " "))
     if gapless:
       self.send_command(('set_property', 'access-references', False))
+      if gapless == 'p':
+        self.send_command(('set_property', 'prefetch-playlist', True))
     self.is_search_manager_running = None
     self.is_request_manager_running = None
     self.is_events_manager_running = None
@@ -2928,7 +2930,7 @@ if __name__ == '__main__':
   parser.add_argument('--wmpdmc_no_mkv', '-w', help=LSTRINGS['parser_mkv'], action='store_true')
   parser.add_argument('--trust_controler', '-t', help=LSTRINGS['parser_trust'], action='store_true')
   parser.add_argument('--search_subtitles', '-s', help=LSTRINGS['parser_subtitles'], action='store_true')
-  parser.add_argument('--gapless', '-g', help=LSTRINGS['parser_gapless'], action='store_true')
+  parser.add_argument('--gapless', '-g', help=LSTRINGS['parser_gapless'], nargs='?', const='g', default='')
   parser.add_argument('--verbosity', '-v', metavar='VERBOSE', help=LSTRINGS['parser_verbosity'], type=int, choices=[0, 1, 2], default=0)
 
   args = parser.parse_args()
