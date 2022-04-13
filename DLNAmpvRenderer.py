@@ -2325,6 +2325,7 @@ class DLNARenderer:
   'http-get:*:video/x-ms-wm:*,' \
   'http-get:*:video/x-ms-wmx:*,' \
   'http-get:*:video/x-ms-wvx:*,' \
+  'http-get:*:audio/x-wavpack:*,' \
   'rtsp-rtp-udp:*:audio/L16:*,' \
   'rtsp-rtp-udp:*:audio/L8:*,' \
   'rtsp-rtp-udp:*:audio/mpeg:*,' \
