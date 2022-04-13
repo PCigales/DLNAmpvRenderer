@@ -18,7 +18,7 @@ To run the application:
 
  DLNAmpvRenderer -h to display the complete syntax of command line and abbreviated commands
     
- DLNAmpvRenderer [-h] [--bind RENDERER_TCP_IP] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--rotate_jpeg] [--wmpdmc_no_mkv] [--trust_controler] [--search_subtitles] [--gapless] [--verbosity VERBOSE]  
+ DLNAmpvRenderer [-h] [--bind RENDERER_TCP_IP] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--rotate_jpeg] [--wmpdmc_no_mkv] [--trust_controler] [--search_subtitles] [--gapless [p]] [--verbosity VERBOSE]  
     
   --bind RENDERER_TCP_IP: the ip address used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests (to set it manually if the script does not manage to self-determine the ip address of the host or to select a specific network interface)    
   --port RENDERER_TCP_PORT: the port used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests    
@@ -29,10 +29,10 @@ To run the application:
   --wmpdmc_no_mkv: when set, Windows Media Player Digital Media Controller will transcode 'mkv' (matroska) files to 'mpegts' before streaming the content, allowing remote control of the playback, otherwise, the 'mkv' file will be streamed as it is, and the seekbar will probably be inactive in WMPDMC (but available in mpv)    
   --trust_controler: when set, the URL of the content sent to the renderer is not checked before being passed to mpv, which will not work if the server throws errors at range requests (as some DLNA servers do)    
   --search_subtitles: when set, always requests subtitles, trying different extensions if no subtitle uri is provided by the controler or the server (may slow down the process)     
-  --gapless: when set, enables gapless playback (but compatibility with controlers supporting this feature is not ensured as it is not standardized) but disables playlist loading in mpv - if the access to the media contents has latency, it may be necessary to use the "prefetch-playlist" option (by adding "--prefetch-playlist=yes" to mpv.bat or "prefetch-list=yes" in mpv.conf as explained below)     
+  --gapless: when set, enables gapless playback (but compatibility with controlers supporting this feature is not ensured as it is not standardized) but disables playlist loading in mpv - if the access to the media contents has latency, it may be necessary to use the "prefetch-playlist" option (by either specifying "p" after the argument, or adding "--prefetch-playlist=yes" to mpv.bat or "prefetch-list=yes" in mpv.conf as explained below) which is experimental and might make mpv malfunction according to the manual     
   --verbosity VERBOSE: for troubleshooting purposes, from 0 (default) to 2  
 
- Example: DLNAmpvRenderer -p 9100 -m -f -r
+ Example: DLNAmpvRenderer -p 9100 -m -f -g p
 
 As for the settings of the firewall, mpv needs outgoing TCP connections allowed, and python outgoing TCP and UDP connections, as well as incoming TCP connections from local network on local port RENDERER_TCP_PORT (as in command line), incoming UDP connections from local network on local port 1900.
 
