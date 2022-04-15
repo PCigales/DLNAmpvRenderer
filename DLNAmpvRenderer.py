@@ -1,4 +1,4 @@
-# DLNAmpvRenderer v1.1.8 (https://github.com/PCigales/DLNAmpvRenderer)
+# DLNAmpvRenderer v1.2.0 (https://github.com/PCigales/DLNAmpvRenderer)
 # Copyright © 2022 PCigales
 # This program is licensed under the GNU GPLv3 copyleft license (see https://www.gnu.org/licenses)
 
@@ -28,6 +28,7 @@ UDN = 'uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, 'DLNAmpvRenderer'))
 
 FR_STRINGS = {
   'license': 'Ce programme est sous licence copyleft GNU GPLv3 (voir https://www.gnu.org/licenses)',
+  'help': 'affichage du message d\'aide et interruption du script', 
   'parser_ip': 'adresse IP du renderer [auto-sélectionnée par défaut]',
   'parser_port': 'port TCP du renderer [8000 par défaut]',
   'parser_name': 'nom du renderer [DLNAmpvRenderer par défaut]',
@@ -56,6 +57,7 @@ FR_STRINGS = {
 }
 EN_STRINGS = {
   'license': 'This program is licensed under the GNU GPLv3 copyleft license (see https://www.gnu.org/licenses)',
+  'help': 'display of the help message and interruption of the script',
   'parser_ip': 'IP address of the renderer [auto-selected by default]',
   'parser_port': 'TCP port of the renderer [8000 by default]',
   'parser_name': 'name of the renderer [DLNAmpvRenderer by default]',
@@ -2918,13 +2920,14 @@ class DLNARenderer:
 
 if __name__ == '__main__':
 
-  print('DLNAmpvRenderer v1.1.8 (https://github.com/PCigales/DLNAmpvRenderer)    Copyright © 2022 PCigales')
+  print('DLNAmpvRenderer v1.2.0 (https://github.com/PCigales/DLNAmpvRenderer)    Copyright © 2022 PCigales')
   print(LSTRINGS['license'])
   print('');
 
   formatter = lambda prog: argparse.HelpFormatter(prog, max_help_position=50, width=119)
-  CustomArgumentParser = partial(argparse.ArgumentParser, formatter_class=formatter)
+  CustomArgumentParser = partial(argparse.ArgumentParser, formatter_class=formatter, add_help=False)
   parser = CustomArgumentParser()
+  parser.add_argument('--help', '-h', action='help', default=argparse.SUPPRESS, help=LSTRINGS['help'])
   parser.add_argument('--bind', '-b', metavar='RENDERER_TCP_IP', help=LSTRINGS['parser_ip'], default='')
   parser.add_argument('--port', '-p', metavar='RENDERER_TCP_PORT', help=LSTRINGS['parser_port'], type=int, default=8000)
   parser.add_argument('--name', '-n', metavar='RENDERER_NAME', help=LSTRINGS['parser_name'], default='DLNAmpvRenderer')
