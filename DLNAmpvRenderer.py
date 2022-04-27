@@ -87,7 +87,7 @@ EN_STRINGS = {
 
 LSTRINGS = EN_STRINGS
 try:
-  if locale.getdefaultlocale()[0][:2].lower() == 'fr':
+  if locale.getlocale()[0][:2].lower() == 'fr':
     LSTRINGS = FR_STRINGS
 except:
   pass
