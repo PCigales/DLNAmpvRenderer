@@ -51,6 +51,8 @@ FR_STRINGS = {
   'ip_failure': 'Échec de la récupération de l\'addresse ip de l\'hôte',
   'request_failure': 'Échec du démarrage de l\'écoute des requêtes à l\'adresse %s:%s',
   'current_content': 'Contenu en cours: %s | %s | %s',
+  'next_content': 'Prochain contenu: %s | %s | %s …',
+  'next_current': '… en cours',
   'video': 'vidéo',
   'audio': 'audio',
   'image': 'image'
@@ -80,6 +82,8 @@ EN_STRINGS = {
   'ip_failure': 'Failure of the retrieval of the host ip address',
   'request_failure': 'Failure of the startup of the listening of requests at the address %s:%s',
   'current_content': 'Current content: %s | %s | %s',
+  'next_content': 'Next content: %s | %s | %s …',
+  'next_current': '… current',
   'video': 'video',
   'audio': 'audio',
   'image': 'image'
@@ -87,7 +91,7 @@ EN_STRINGS = {
 
 LSTRINGS = EN_STRINGS
 try:
-  if locale.getlocale()[0][:2].lower() == 'fr':
+  if locale.getlocale()[0][:2].lower() == 'dfr':
     LSTRINGS = FR_STRINGS
 except:
   pass
@@ -423,7 +427,7 @@ class IPCmpvControler(threading.Thread):
     self.Pipe_buffer = ctypes.create_string_buffer(10000)
     self.Cmd_Event = HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR(urllib.parse.quote(self.title_name, safe='') + '_input')))
     self.Msg_event = threading.Event()
-    self.Cmd_buffer = ["run", ('set_property', 'script-opts', 'osc-visibility=never'), ('observe_property', 1, 'time-pos'), ('observe_property', 2, 'pause'), ('observe_property', 3, 'duration'), ('observe_property', 4, 'mute'), ('observe_property', 5, 'volume'), ('observe_property', 5, 'playlist-playing-pos'), ('set_property', 'title', '${?media-title:${media-title}}${!media-title:No file} - %s' % title_name)]
+    self.Cmd_buffer = ["run", ('set_property', 'script-opts', 'osc-visibility=never'), ('observe_property', 1, 'time-pos'), ('observe_property', 2, 'pause'), ('observe_property', 3, 'duration'), ('observe_property', 4, 'mute'), ('observe_property', 5, 'volume'), ('observe_property', 6, 'playlist-playing-pos'), ('observe_property', 7, 'idle-active'), ('set_property', 'title', '${?media-title:${media-title}}${!media-title:No file} - %s' % title_name)]
     self.Msg_buffer = ['run']
     self.Read_pending = False
     kernel32.ResetEvent(self.lpOverlapped_r.contents.hEvent)
@@ -489,15 +493,22 @@ class IPCmpvControler(threading.Thread):
                 self.Player_events.append(('Volume', self.Player_volume))
                 self.Player_event_event.set()
                 self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('Volume', self.Player_volume), 2)
+            elif name == "idle-active":
+              if msg_dict.get('data', '') == True and self.Player_status != "NO_MEDIA_PRESENT":
+                self.Player_status = "STOPPED"
+                self.Player_events.append(('TransportState', "STOPPED"))
+                self.Player_time_pos = ""
+                self.Player_event_event.set()
+                self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportState', "STOPPED"), 1)
             elif name == "pause":
-              if msg_dict.get('data','') == True:
+              if msg_dict.get('data', '') == True:
                 self.Player_paused = True
                 if self.Player_status == "PLAYING":
                   self.Player_status = "PAUSED_PLAYBACK"
                   self.Player_events.append(('TransportState', "PAUSED_PLAYBACK"))
                   self.Player_event_event.set()
                   self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportState', "PAUSED_PLAYBACK"), 1)
-              elif msg_dict.get('data','') == False:
+              elif msg_dict.get('data', '') == False:
                 self.Player_paused = False
                 if self.Player_status == "PAUSED_PLAYBACK":
                   self.Player_status = "PLAYING"
@@ -521,12 +532,6 @@ class IPCmpvControler(threading.Thread):
               self.Player_events.append(('TransportStatus', "ERROR_OCCURRED"))
               self.Player_event_event.set()
               self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportStatus', "ERROR_OCCURRED"), 2)
-          elif msg_dict['event'] == "idle":
-            self.Player_status = "STOPPED"
-            self.Player_events.append(('TransportState', "STOPPED"))
-            self.Player_time_pos = ""
-            self.Player_event_event.set()
-            self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportState', "STOPPED"), 1)
           elif msg_dict['event'] == 'seek':
             self.Player_status = "TRANSITIONING"
             self.Player_events.append(('TransportState', "TRANSITIONING"))
@@ -2597,6 +2602,7 @@ class DLNARenderer:
           self.NextAVTransportURIMetaData = ""
           self.NextLoadfileOptions = ""
           self.events_add('AVTransport', (('AVTransportURI', self.AVTransportURI), ('AVTransportURIMetaData', self.AVTransportURIMetaData), ('CurrentTrackMetaData', self.AVTransportURIMetaData), ('CurrentTrackURI', self.AVTransportURI), ('NextAVTransportURI', self.NextAVTransportURI), ('NextAVTransportURIMetaData', self.NextAVTransportURIMetaData)))
+          self.logger.log(LSTRINGS['next_current'], 0)
         elif event[0] == 'Mute':
           self.Mute = "1" if event[1] else "0"
           self.events_add('RenderingControl', (('Mute channel="Master"', self.Mute),))
@@ -2805,7 +2811,7 @@ class DLNARenderer:
       else:
         self.NextLoadfileOptions = load_opt
         self.send_command(('loadfile', self.NextAVTransportURI, 'append', self.NextLoadfileOptions))
-        self.logger.log('Prochain contenu: %s | %s | %s' % ('vidéo' if 'video' in upnp_class.lower() else 'audio' if 'audio' in upnp_class.lower() else 'image' if 'image' in upnp_class.lower() else '', title, self.NextAVTransportURI + ((' + ' + sub_uri) if sub_uri else '')), 1)
+        self.logger.log(LSTRINGS['next_content'] % ('vidéo' if 'video' in upnp_class.lower() else 'audio' if 'audio' in upnp_class.lower() else 'image' if 'image' in upnp_class.lower() else '', title, self.NextAVTransportURI + ((' + ' + sub_uri) if sub_uri else '')), 0)
         if rota != 0:
           self.logger.log('Rotation du prochain contenu de %s°' % rota, 2)
     elif acti.lower() == 'Play'.lower():
