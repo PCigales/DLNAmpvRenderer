@@ -1,4 +1,4 @@
-# DLNAmpvRenderer v1.2.1 (https://github.com/PCigales/DLNAmpvRenderer)
+# DLNAmpvRenderer v1.2.2 (https://github.com/PCigales/DLNAmpvRenderer)
 # Copyright © 2022 PCigales
 # This program is licensed under the GNU GPLv3 copyleft license (see https://www.gnu.org/licenses)
 
@@ -2934,7 +2934,7 @@ class DLNARenderer:
 
 if __name__ == '__main__':
 
-  print('DLNAmpvRenderer v1.2.1 (https://github.com/PCigales/DLNAmpvRenderer)    Copyright © 2022 PCigales')
+  print('DLNAmpvRenderer v1.2.2 (https://github.com/PCigales/DLNAmpvRenderer)    Copyright © 2022 PCigales')
   print(LSTRINGS['license'])
   print('')
 
