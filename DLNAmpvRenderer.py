@@ -1080,7 +1080,7 @@ class DLNARequestHandler(socketserver.StreamRequestHandler):
             except:
               self.server.logger.log('Échec de la réponse à la requête POST %s-%s' % (serv, act), 1)
           elif res in ('401', '402', '701', '716'):
-            resp_body = locals()['resp_err_ise%s_body' % '401'].encode('UTF-8')
+            resp_body = locals()['resp_err_ise%s_body' % res].encode('UTF-8')
             try:
               self.request.sendall(resp_err_ise.replace('##len##', str(len(resp_body))).encode('ISO-8859-1') + resp_body)
             except:
