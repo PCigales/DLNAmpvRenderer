@@ -20,7 +20,7 @@ To run the application:
     
  DLNAmpvRenderer [-h] [--bind RENDERER_IP] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--rotate_jpeg] [--wmpdmc_no_mkv] [--trust_controler] [--search_subtitles] [--gapless [p]] [--verbosity VERBOSE]  
     
-  --bind RENDERER_IP: the ip address used by the renderer on the local machine for SSDP and sent to the controlers in the advertisements and the answers to the search requests (to set it manually if the script does not manage to self-determine the ip address of the host or to select a specific network interface)    
+  --bind RENDERER_IP: the ip address used by the renderer on the local machine for communications with the controllers (to set it manually if the script does not manage to self-determine the ip address of the host or to select a specific network interface or all interfaces if no address is provided)    
   --port RENDERER_TCP_PORT: the port used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests    
   --name RENDERER_NAME: the name of the renderer, used to generate the uuid    
   --minimize: when set, minimizes the window of mpv when inactive and restore it to its previous size when a playback is launched (useful when displaying photos as some controlers stop the playback between two consecutive pictures or when playing music as there is no use showing the window)    
