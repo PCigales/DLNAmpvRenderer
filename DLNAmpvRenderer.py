@@ -194,10 +194,10 @@ def _jpeg_exif_orientation(uri):
 
 class HTTPExplodedMessage():
 
-  __slots__ = ('method', 'path', 'version', 'code', 'message', 'headers', 'body')
+  __slots__ = ('method', 'path', 'version', 'code', 'message', 'headers', 'body', 'expect_close')
 
   def __init__(self):
-    self.method = self.path = self.version = self.code = self.message = self.body = None
+    self.method = self.path = self.version = self.code = self.message = self.body = self.expect_close = None
     self.headers = {}
 
   def __bool__(self):
@@ -210,10 +210,14 @@ class HTTPExplodedMessage():
   def header(self, name, default=None):
     return self.headers.get(name.title(), default)
 
+  def in_header(self, name, value):
+    h = self.header(name)
+    return False if h is None else (value.lower() in map(str.strip, h.lower().split(',')))
+
   def __repr__(self):
     if self:
       try:
-        return '\r\n'.join(('<HTTPExplodedMessage at %#x>\r\n----------' % id(self), (' '.join(filter(None, (self.method, self.path, self.version, self.code, self.message)))), *map(': '.join, self.headers.items()), '----------\r\nLength of body: %s byte(s)' % len(self.body or '')))
+        return '\r\n'.join(('<HTTPExplodedMessage at %#x>\r\n----------' % id(self), (' '.join(filter(None, (self.method, self.path, self.version, self.code, self.message)))), *map(': '.join, self.headers.items()), '----------\r\nLength of body: %s byte(s)' % len(self.body or ''), '----------\r\nClose expected: %s' % self.expect_close))
       except:
         return '<HTTPExplodedMessage at %#x>\r\n<corrupted object>' % id(self)
     else:
@@ -244,13 +248,15 @@ class HTTPMessage():
         header_name = header_name.strip().title()
         if header_name:
           header_value = header_value.strip()
-          if not header_name in ('Content-Length', 'Location') and http_message.headers.get(header_name):
+          if not header_name in ('Content-Length', 'Location', 'Host') and http_message.headers.get(header_name):
             if header_value:
               http_message.headers[header_name] += ', ' + header_value
           else:
             http_message.headers[header_name] = header_value
         else:
           return False
+    if a is None:
+      return False
     if a[:4].upper() == 'HTTP':
       http_message.version = a.upper()
       http_message.code = b
@@ -259,13 +265,15 @@ class HTTPMessage():
       http_message.method = a.upper()
       http_message.path = b
       http_message.version = c.upper()
+    http_message.expect_close = http_message.in_header('Connection', 'close') or (http_message.version.upper() != 'HTTP/1.1' and not http_message.in_header('Connection', 'keep-alive'))
     return True
 
-  def __new__(cls, message=None, body=True, decode='utf-8', timeout=5, max_length=1048576):
+  def __new__(cls, message=None, body=True, decode='utf-8', timeout=5, max_length=1048576, max_hlength=1048576):
     http_message = HTTPExplodedMessage()
     if message is None:
       return http_message
-    rem_length = max_length
+    max_hlength = min(max_length, max_hlength)
+    rem_length = max_hlength
     iss = isinstance(message, socket.socket)
     if not iss:
       msg = message[0]
@@ -294,20 +302,31 @@ class HTTPMessage():
       msg = msg + bloc
     if not cls._read_headers(msg[:body_pos].decode('ISO-8859-1'), http_message):
       return http_message.clear()
+    if not iss:
+      http_message.expect_close = True
     if http_message.code in ('100', '101', '204', '304'):
       http_message.body = b''
       return http_message
     if not body:
       http_message.body = msg[body_pos:]
       return http_message
-    body_len = 0
-    chunked = 'chunked' in map(str.strip, http_message.header('Transfer-Encoding', '').lower().split(','))
-    if not chunked:
-      try:
-        body_len = int(http_message.header('Content-Length', '0'))
-      except:
-        return http_message.clear()
-    if http_message.header('Expect', '').lower() == '100-continue' and iss:
+    rem_length += max_length - max_hlength
+    chunked = http_message.in_header('Transfer-Encoding', 'chunked')
+    if chunked:
+      body_len = -1
+    else:
+      body_len = http_message.header('Content-Length')
+      if body_len is None:
+        if not iss or (http_message.code in ('200', '206') and http_message.expect_close):
+          body_len = -1
+        else:
+          body_len = 0
+      else:
+        try:
+          body_len = max(0, int(body_len))
+        except:
+          return http_message.clear()
+    if http_message.in_header('Expect', '100-continue') and iss:
       if body_pos + body_len - len(msg) <= rem_length:
         try:
           message.sendall('HTTP/1.1 100 Continue\r\n\r\n'.encode('ISO-8859-1'))
@@ -320,10 +339,25 @@ class HTTPMessage():
           pass
         return http_message.clear()
     if not chunked:
-      if body_pos + body_len - len(msg) > rem_length:
-        return http_message.clear()
-      if len(msg) < body_pos + body_len:
+      if body_len < 0:
         if not iss:
+          http_message.body = msg[body_pos:]
+        else:
+          bbuf = BytesIO()
+          rem_length -= bbuf.write(msg[body_pos:])
+          while rem_length > 0:
+            try:
+              bw = bbuf.write(message.recv(min(rem_length, 1048576)))
+              if not bw:
+                break
+              rem_length -= bw
+            except:
+              return http_message.clear()
+          if rem_length <= 0:
+            return http_message.clear()
+          http_message.body = bbuf.getvalue()
+      elif len(msg) < body_pos + body_len:
+        if not iss or body_pos + body_len - len(msg) > rem_length:
           return http_message.clear()
         bbuf = BytesIO()
         body_len -= bbuf.write(msg[body_pos:])
@@ -343,6 +377,7 @@ class HTTPMessage():
       buff = msg[body_pos:]
       while True:
         chunk_pos = -1
+        rem_slength = max_hlength - len(buff)
         while chunk_pos < 0:
           buff = buff.lstrip(b'\r\n')
           chunk_pos = buff.find(b'\r\n')
@@ -353,18 +388,19 @@ class HTTPMessage():
           if chunk_pos >= 0:
             chunk_pos += 1
             break
-          if not iss or rem_length <= 0:
+          if not iss or rem_slength <= 0 or rem_length <= 0:
             return http_message.clear()
           try:
-            bloc = message.recv(min(rem_length, 1048576))
+            bloc = message.recv(min(rem_length, rem_slength, 1048576))
             if not bloc:
               return http_message.clear()
           except:
             return http_message.clear()
           rem_length -= len(bloc)
+          rem_slength -= len(bloc)
           buff = buff + bloc
         try:
-          chunk_len = int(buff[:chunk_pos].rstrip(b'\r\n'), 16)
+          chunk_len = int(buff[:chunk_pos].split(b';', 1)[0].rstrip(b'\r\n'), 16)
           if not chunk_len:
             break
         except:
@@ -389,7 +425,7 @@ class HTTPMessage():
           bbuf.write(buff[chunk_pos:chunk_pos+chunk_len])
           buff = buff[chunk_pos+chunk_len:]
       http_message.body = bbuf.getvalue()
-      buff = b'\r\n' + buff
+      rem_length = min(rem_length, max_hlength - body_pos - len(buff) + chunk_pos)
       while not (b'\r\n\r\n' in buff or b'\n\n' in buff):
         if not iss or rem_length <= 0:
           return http_message.clear()
@@ -401,7 +437,7 @@ class HTTPMessage():
           return http_message.clear()
         rem_length -= len(bloc)
         buff = buff + bloc
-    if body:
+    if http_message.body:
       try:
         if decode:
           http_message.body = http_message.body.decode(decode)
@@ -420,7 +456,7 @@ class HTTPRequest():
     'Host: %s\r\n%s' \
     '\r\n'
 
-  def __new__(cls, url, method=None, headers=None, data=None, timeout=30, max_length=1073741824, pconnection=None, ip=''):
+  def __new__(cls, url, method=None, headers=None, data=None, timeout=30, max_length=1073741824, max_hlength=1048576, pconnection=None, ip=''):
     if url is None:
       return HTTPMessage()
     if method is None:
@@ -428,19 +464,23 @@ class HTTPRequest():
     redir = 0
     try:
       url_p = urllib.parse.urlsplit(url, allow_fragments=False)
-      headers = {} if headers is None else dict((('Connection', 'close') if k.lower() == 'connection' else (k, v)) for k, v in headers.items() if v and not k.lower() in ('host', 'content-length') and not (k.lower() == 'connection' and v.lower() != 'close'))
-      if not 'accept-encoding' in (k.lower() for k in headers):
+      if headers is None:
+        headers = {}
+      hitems = headers.items()
+      if pconnection is None:
+        pconnection = [None]
+        hccl = True
+      else:
+        hccl = 'close' in (e.strip() for k, v in hitems if k.lower() == 'connection' for e in v.lower().split(','))
+      headers = {k: v for k, v in hitems if not k.lower() in ('host', 'content-length', 'connection', 'expect')}
+      if not 'accept-encoding' in (k.lower() for k, v in hitems):
         headers['Accept-Encoding'] = 'identity'
       if data is not None:
-        if not 'chunked' in map(str.strip, ','.join(v.lower() for k, v in headers.items() if k.lower() == 'transfer-encoding').split(',')):
+        if not 'chunked' in (e.strip() for k, v in hitems if k.lower() == 'transfer-encoding' for e in v.lower().split(',')):
           headers['Content-Length'] = str(len(data))
+      headers['Connection'] = 'close' if hccl else 'keep-alive'
     except:
       return HTTPMessage()
-    if pconnection is None:
-      pconnection = [None]
-      headers['Connection'] = 'close'
-    elif not headers.get('Connection'):
-      headers['Connection'] = 'keep-alive'
     while True:
       try:
         if pconnection[0] is None:
@@ -450,10 +490,21 @@ class HTTPRequest():
             pconnection[0] = cls.SSLContext.wrap_socket(socket.create_connection((url_p.netloc + ':443').split(':', 2)[:2], timeout=timeout, source_address=(ip, 0)), server_side=False, server_hostname=url_p.netloc.split(':')[0])
           else:
             raise
+        else:
+          try:
+            pconnection[0].settimeout(timeout)
+          except:
+            pass
         msg = cls.RequestPattern % (method, (url_p.path + ('?' + url_p.query if url_p.query else '')).replace(' ', '%20') or '/', url_p.netloc, ''.join(k + ': ' + v + '\r\n' for k, v in headers.items()))
         pconnection[0].sendall(msg.encode('iso-8859-1') + (data or b''))
-        resp = HTTPMessage(pconnection[0], body=(method.upper() != 'HEAD'), decode=None, timeout=timeout, max_length=max_length)
-        code = resp.code
+        code = '100'
+        while code == '100':
+          resp = HTTPMessage(pconnection[0], body=(method.upper() != 'HEAD'), decode=None, timeout=timeout, max_length=max_length, max_hlength=max_hlength)
+          code = resp.code
+          if code == '100':
+            redir += 1
+            if redir > 5:
+              raise
         if code is None:
           raise
         if code[:2] == '30' and code != '304':
@@ -461,7 +512,7 @@ class HTTPRequest():
             url = urllib.parse.urljoin(url, resp.header('location'))
             urlo_p = url_p
             url_p = urllib.parse.urlsplit(url, allow_fragments=False)
-            if headers['Connection'] == 'close' or resp.header('Connection', '').lower() == 'close' or ((resp.version or '').upper() != 'HTTP/1.1' and resp.header('Connection', '').lower() != 'keep-alive') or (urlo_p.scheme != url_p.scheme or urlo_p.netloc != url_p.netloc):
+            if headers['Connection'] == 'close' or resp.expect_close or (urlo_p.scheme != url_p.scheme or urlo_p.netloc != url_p.netloc):
               try:
                 pconnection[0].close()
               except:
@@ -489,7 +540,7 @@ class HTTPRequest():
           pass
         pconnection[0] = None
         return HTTPMessage()
-    if headers['Connection'] == 'close' or resp.header('Connection', '').lower() == 'close' or ((resp.version or '').upper() != 'HTTP/1.1' and resp.header('Connection', '').lower() != 'keep-alive'):
+    if headers['Connection'] == 'close' or resp.expect_close:
       try:
         pconnection[0].close()
       except:
@@ -850,7 +901,7 @@ class DLNASearchServer():
         except:
           self.logger.log('Échec de la mise en place de l\'écoute de recherche de renderer sur l\'interface %s' % ip, 1)
       while not self.__shutdown_request:
-        ready = selector.select()
+        ready = selector.select(0.5)
         if self.__shutdown_request:
           break
         for r in ready:
@@ -881,6 +932,7 @@ class DLNARequestServer(socketserver.ThreadingTCPServer):
 
   allow_reuse_address = True
   request_queue_size = 100
+  block_on_close = False
 
   def __init__(self, *args, verbosity, **kwargs):
     self.logger = log_event(verbosity)
