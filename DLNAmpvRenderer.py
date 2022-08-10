@@ -1424,7 +1424,7 @@ class EventSubscription:
   def stop_event_management(self):
     self.set_end_time(0)
     try:
-      self.PConnection.close()
+      self.PConnection[0].close()
     except:
       pass
     self.EventEvent.set()
