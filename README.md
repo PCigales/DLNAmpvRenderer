@@ -18,7 +18,7 @@ To run the application:
 
  DLNAmpvRenderer -h to display the complete syntax of command line and abbreviated commands
     
- DLNAmpvRenderer [-h] [--bind [RENDERER_IP]] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--rotate_jpeg] [--wmpdmc_no_mkv] [--trust_controler] [--search_subtitles] [--gapless [p]] [--verbosity VERBOSE]  
+ DLNAmpvRenderer [-h] [--bind [RENDERER_IP]] [--port RENDERER_TCP_PORT] [--name RENDERER_NAME] [--minimize] [--fullscreen] [--wmpdmc_no_mkv] [--trust_controler] [--search_subtitles] [--gapless [p]] [--verbosity VERBOSE]  
     
   --bind RENDERER_IP: the ip address used by the renderer on the local machine for communications with the controllers (to set it manually if the script does not manage to self-determine the ip address of the host or to select a specific network interface or all interfaces if no address is provided)    
   --port RENDERER_TCP_PORT: the port used by the renderer on the local machine sent to the controlers in the advertisements and the answers to the search requests    
