@@ -438,7 +438,7 @@ class HTTPRequest():
           elif url_p.scheme.lower() == 'https':
             n, s, p = url_p.netloc.rpartition(':')
             if s != ':' or ']' in p:
-              n = url_p.netlocloc
+              n = url_p.netloc
             pconnection[0] = cls.SSLContext.wrap_socket(socket.create_connection((url_p.hostname, url_p.port if url_p.port is not None else 443), timeout=timeout, source_address=(ip, 0)), server_side=False, server_hostname=n)
           else:
             raise
@@ -1376,7 +1376,7 @@ class EventSubscription:
   def stop_event_management(self):
     self.set_end_time(0)
     try:
-      self.PConnection.close()
+      self.PConnection[0].close()
     except:
       pass
     self.EventEvent.set()
