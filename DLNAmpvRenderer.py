@@ -1,4 +1,4 @@
-# DLNAmpvRenderer v1.3.0 (https://github.com/PCigales/DLNAmpvRenderer)
+# DLNAmpvRenderer v1.3.1 (https://github.com/PCigales/DLNAmpvRenderer)
 # Copyright © 2022 PCigales
 # This program is licensed under the GNU GPLv3 copyleft license (see https://www.gnu.org/licenses)
 
@@ -37,7 +37,6 @@ FR_STRINGS = {
   'parser_name': 'nom du renderer [DLNAmpvRenderer par défaut]',
   'parser_minimized': 'passage en mode minimisé quand inactif [désactivé par défaut]',
   'parser_fullscreen': 'passage en mode plein écran à chaque session [désactivé par défaut]',
-  'parser_rotation': 'rotation automatique des images jpeg [désactivé par défaut, était nécessaire avec les anciennes versions de mpv]',
   'parser_mkv': 'masque la prise en charge du format matroska à WMPDMC pour permettre le contrôle distant [désactivé par défaut]',
   'parser_trust': 'désactive la vérification des adresses avant leur transmission à mpv [désactivé par défaut]',
   'parser_subtitles': 'active la recherche systématique de sous-titres [désactivé par défaut]',
@@ -68,7 +67,6 @@ EN_STRINGS = {
   'parser_name': 'name of the renderer [DLNAmpvRenderer by default]',
   'parser_minimized': 'switching to minimized mode when idle [disabled by default]',
   'parser_fullscreen': 'switching to fullscreen mode at each session [disabled by default]',
-  'parser_rotation': 'automatic rotation of jpeg images [disabled by default, was necessary with the old versions of mpv]',
   'parser_mkv': 'mask support of matroska format to WMPDMC to allow the remote control [disabled by default]',
   'parser_trust': 'disable the checking of the addresses before their transmission to mpv [disabled by default]',
   'parser_subtitles': 'enable systematic search for subtitles [disabled by default]',
@@ -92,6 +90,7 @@ EN_STRINGS = {
   'image': 'image'
 }
 
+locale.setlocale(locale.LC_TIME, '')
 LSTRINGS = EN_STRINGS
 try:
   if locale.getlocale()[0][:2].lower() == 'fr':
@@ -107,9 +106,7 @@ class log_event:
 
   def log(self, msg, level):
     if level <= self.verbosity:
-      now = time.localtime()
-      s_now = '%02d/%02d/%04d %02d:%02d:%02d' % (now.tm_mday, now.tm_mon, now.tm_year, now.tm_hour, now.tm_min, now.tm_sec)
-      print(s_now, ':', msg)
+      print(time.strftime('%x %X', time.localtime()), ':', msg)
 
 
 def _open_url(url, method=None, timeout=None, test_range=False):
@@ -140,56 +137,6 @@ def _XMLGetNodeText(node):
     if childNode.nodeType == node.TEXT_NODE:
       text.append(childNode.data)
   return(''.join(text))
-
-def _jpeg_exif_orientation(uri):
-  f = None
-  try:
-    if r'://' in uri:
-      f = _open_url(uri, method='GET')
-    else:
-      f = open(uri, 'rb')
-    if f.read(2) != b'\xff\xd8':
-      f.close()
-      return
-    t = f.read(2)
-    if t == b'\xff\xe0':
-      len = struct.unpack('!H', f.read(2))[0]
-      f.read(len - 2)
-      t = f.read(2)
-    if t != b'\xff\xe1':
-      f.close()
-      return None
-    len = struct.unpack('!H', f.read(2))[0]
-    if f.read(6) != b'Exif\x00\x00':
-      f.close()
-      return None
-    ba = {b'MM': '>', b'II': '<'}.get(f.read(2),'')
-    if ba == '':
-      f.close()
-      return None
-    if f.read(2) != (b'\x00\x2a' if ba == '>' else b'\x2a\x00') :
-      f.close()
-      return None
-    f.read(struct.unpack(ba + 'I', f.read(4))[0] - 8)
-    ne = struct.unpack(ba + 'H', f.read(2))[0]
-    for i in range(ne):
-      e = f.read(12)
-      if struct.unpack(ba + 'H', e[0:2])[0] == 0x0112:
-        nb = {1: 1, 3: 2, 4:4}.get(struct.unpack(ba + 'H', e[2:4])[0],0)
-        if nb == 0 or struct.unpack(ba + 'I', e[4:8])[0] != 1:
-          f.close()
-          return None
-        f.close()
-        return {1: 'upper-left', 3: 'lower-right', 6: 'upper-right', 8: 'lower-left'}.get(struct.unpack(ba + {1: 'B', 2: 'H', 4: 'I'}[nb], e[8:8+nb])[0], None)
-    f.close()
-    return None
-  except:
-    if f:
-      try:
-        f.close()
-      except:
-        pass
-    return None
 
 
 class HTTPExplodedMessage():
@@ -282,6 +229,8 @@ class HTTPMessage():
       msg = b''
     while True:
       msg = msg.lstrip(b'\r\n')
+      if msg and msg[0] < 0x20:
+        return http_message
       body_pos = msg.find(b'\r\n\r\n')
       if body_pos >= 0:
         body_pos += 4
@@ -485,9 +434,12 @@ class HTTPRequest():
       try:
         if pconnection[0] is None:
           if url_p.scheme.lower() == 'http':
-            pconnection[0] = socket.create_connection((url_p.netloc + ':80').split(':', 2)[:2], timeout=timeout, source_address=(ip, 0))
+            pconnection[0] = socket.create_connection((url_p.hostname, url_p.port if url_p.port is not None else 80), timeout=timeout, source_address=(ip, 0))
           elif url_p.scheme.lower() == 'https':
-            pconnection[0] = cls.SSLContext.wrap_socket(socket.create_connection((url_p.netloc + ':443').split(':', 2)[:2], timeout=timeout, source_address=(ip, 0)), server_side=False, server_hostname=url_p.netloc.split(':')[0])
+            n, s, p = url_p.netloc.rpartition(':')
+            if s != ':' or ']' in p:
+              n = url_p.netlocloc
+            pconnection[0] = cls.SSLContext.wrap_socket(socket.create_connection((url_p.hostname, url_p.port if url_p.port is not None else 443), timeout=timeout, source_address=(ip, 0)), server_side=False, server_hostname=n)
           else:
             raise
         else:
@@ -1424,7 +1376,7 @@ class EventSubscription:
   def stop_event_management(self):
     self.set_end_time(0)
     try:
-      self.PConnection[0].close()
+      self.PConnection.close()
     except:
       pass
     self.EventEvent.set()
@@ -2548,6 +2500,7 @@ class DLNARenderer:
   'http-get:*:video/mp2t:*,' \
   'http-get:*:audio/x-ogg:*,' \
   'http-get:*:audio/ac3:*,' \
+  'http-get:*:image/avif:*,' \
   'rtsp-rtp-udp:*:audio/L16:*,' \
   'rtsp-rtp-udp:*:audio/L8:*,' \
   'rtsp-rtp-udp:*:audio/mpeg:*,' \
@@ -2572,7 +2525,7 @@ class DLNARenderer:
     t = ctypes.cast(ctypes.byref(r.table), POINTER(MIB_IPADDRROW * n)).contents
     return tuple(socket.inet_ntoa(e.dwAddr.to_bytes(4, 'little')) for e in t if e.wType & 1)
 
-  def __init__(self, RendererIp='', RendererPort=8000, Minimize=False, FullScreen=False, JpegRotate=False, WMPDMCHideMKV=False, TrustControler=False, SearchSubtitles=False, gapless=False, verbosity=0):
+  def __init__(self, RendererIp='', RendererPort=8000, Minimize=False, FullScreen=False, WMPDMCHideMKV=False, TrustControler=False, SearchSubtitles=False, gapless=False, verbosity=0):
     self.verbosity = verbosity
     self.logger = log_event(verbosity)
     if RendererIp:
@@ -2600,7 +2553,6 @@ class DLNARenderer:
     self.Minimize = Minimize
     self.FullScreen = FullScreen
     self.full_screen = FullScreen
-    self.JpegRotate = JpegRotate
     self.WMPDMCHideMKV = WMPDMCHideMKV
     self.TrustControler = TrustControler
     self.SearchSubtitles = SearchSubtitles
@@ -2920,16 +2872,16 @@ class DLNARenderer:
         node = None
         for ch_node in didl_root.documentElement.childNodes:
           if ch_node.nodeType == ch_node.ELEMENT_NODE:
-            if ch_node.tagName.lower() == 'item':
+            if ch_node.localName.lower() == 'item':
               node = ch_node
               break
         for ch_node in node.childNodes:
           if ch_node.nodeType == ch_node.ELEMENT_NODE:
-            if ':title' in ch_node.tagName.lower():
+            if ch_node.localName.lower() == 'title':
               title = _XMLGetNodeText(ch_node)[:501]
-            elif ch_node.tagName.lower() == 'res':
-              for att in ch_node.attributes.items():
-                if att[0].lower() == 'protocolInfo'.lower():
+            elif ch_node.localName.lower() == 'res':
+              for att in ch_node.attributes.itemsNS():
+                if att[0][1].lower() == 'protocolinfo':
                   if not uri:
                     if not 'DLNA.ORG_CI=' in att[1].upper():
                       uri = _XMLGetNodeText(ch_node)
@@ -2940,13 +2892,15 @@ class DLNARenderer:
                         protocol_info = att[1]
                   if not s_protocol_info and in_args['NextURI'.lower() if is_next else 'CurrentURI'.lower()] == _XMLGetNodeText(ch_node):
                     s_protocol_info = att[1]
-                elif not caption_info and 'subtitlefileuri' in att[0].lower():
+                elif not caption_info and att[0][1].lower() == 'subtitlefileuri':
                   caption_info = att[1]
-            elif ':class' in ch_node.tagName.lower():
+                elif not caption_type and att[0][1].lower() == 'subtitlefiletype':
+                  caption_type = att[1]
+            elif ch_node.localName.lower() == 'class':
               upnp_class = _XMLGetNodeText(ch_node)
-            elif ':captioninfo' in ch_node.tagName.lower():
+            elif ch_node.localName.lower().startswith('captioninfo'):
               caption_info = _XMLGetNodeText(ch_node)
-              caption_type = next(att_v for (att_n, att_v) in ch_node.attributes.items() if att_n.lower()=='sec:type')
+              caption_type = next((att_v for (att_n, att_v) in ch_node.attributes.itemsNS() if att_n[1].lower() == 'type'), '')
       except:
         uri = None
       if not uri:
@@ -2976,7 +2930,11 @@ class DLNARenderer:
           self.TransportState = prev_transp_state
           self.IPCmpvControlerInstance.Player_events.append(('TransportState', prev_transp_state))
           self.IPCmpvControlerInstance.Player_event_event.set()
-        return '716', None
+          return '716', None
+        elif not uri:
+          return '200', out_args
+        else:
+          return '716', None
       title = title or ' '
       load_opt = "force-media-title=%%%d%%%s" % (len(title.encode('utf-8')), title)
       if is_next:
@@ -3000,18 +2958,13 @@ class DLNARenderer:
           rep.close()
       if self.SearchSubtitles and 'object.item.videoItem'.lower() in upnp_class.lower() and not sub_uri and r'://' in uri and not 'Microsoft-HTTPAPI'.lower() in server.lower() and not "BubbleUPnP".lower() in server.lower():
         uri_name = uri.rsplit('.', 1)[0]
-        for sub_ext in ('.ttxt', '.txt', '.smi', '.srt', '.sub', '.ssa', '.ass'):
+        for sub_ext in ('.ttxt', '.txt', '.smi', '.srt', '.sub', '.ssa', '.ass', '.vtt'):
           rep = _open_url(uri_name + sub_ext, method='HEAD', timeout=2)
           if rep:
             sub_uri = uri_name + sub_ext
             caption_type = sub_ext
             rep.close()
             break
-      rota = 0
-      if 'object.item.imageItem'.lower() in upnp_class.lower() and self.JpegRotate:
-        rota = {'upper-left': 0, 'lower-right': 180, 'upper-right': 90, 'lower-left': 270}.get(_jpeg_exif_orientation(self.AVTransportURI), 0)
-      if rota:
-        load_opt += ",video-rotate=%s" % rota
       uri_metadata = '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:dlna="urn:schemas-dlna-org:metadata-1-0/" xmlns:sec="http://www.sec.co.kr/"><item><dc:title>%s</dc:title><upnp:class>%s</upnp:class><res protocolInfo="%s">%s</res>%s</item></DIDL-Lite>' % (html.escape(title), upnp_class, html.escape(protocol_info), html.escape(uri), '<sec:CaptionInfoEx sec:type="%s">%s</sec:CaptionInfoEx>' %(html.escape(caption_type), html.escape(sub_uri)) if sub_uri else '')
       if is_next:
         self.NextAVTransportURIMetaData = uri_metadata
@@ -3043,14 +2996,10 @@ class DLNARenderer:
           self.send_command(('loadfile', self.AVTransportURI, 'replace', self.LoadfileOptions))
           self.send_command(('set_property', 'pause', False))
         self.logger.log(LSTRINGS['current_content'] % (LSTRINGS['video'] if 'video' in upnp_class.lower() else LSTRINGS['audio'] if 'audio' in upnp_class.lower() else LSTRINGS['image'] if 'image' in upnp_class.lower() else '', title, self.AVTransportURI + ((' + ' + sub_uri) if sub_uri else '')), 0)
-        if rota != 0:
-          self.logger.log('Rotation du contenu de %s°' % rota, 2)
       else:
         self.NextLoadfileOptions = load_opt
         self.send_command(('loadfile', self.NextAVTransportURI, 'append', self.NextLoadfileOptions))
         self.logger.log(LSTRINGS['next_content'] % ('vidéo' if 'video' in upnp_class.lower() else 'audio' if 'audio' in upnp_class.lower() else 'image' if 'image' in upnp_class.lower() else '', title, self.NextAVTransportURI + ((' + ' + sub_uri) if sub_uri else '')), 0)
-        if rota != 0:
-          self.logger.log('Rotation du prochain contenu de %s°' % rota, 2)
     elif acti.lower() == 'Play'.lower():
       if self.TransportState == "NO_MEDIA_PRESENT":
         return '701', None
@@ -3163,7 +3112,7 @@ class DLNARenderer:
 
 if __name__ == '__main__':
 
-  print('DLNAmpvRenderer v1.3.0 (https://github.com/PCigales/DLNAmpvRenderer)    Copyright © 2022 PCigales')
+  print('DLNAmpvRenderer v1.3.1 (https://github.com/PCigales/DLNAmpvRenderer)    Copyright © 2022 PCigales')
   print(LSTRINGS['license'])
   print('')
 
@@ -3176,7 +3125,6 @@ if __name__ == '__main__':
   parser.add_argument('--name', '-n', metavar='RENDERER_NAME', help=LSTRINGS['parser_name'], default='DLNAmpvRenderer')
   parser.add_argument('--minimize', '-m', help=LSTRINGS['parser_minimized'], action='store_true')
   parser.add_argument('--fullscreen', '-f', help=LSTRINGS['parser_fullscreen'], action='store_true')
-  parser.add_argument('--rotate_jpeg', '-r', help=LSTRINGS['parser_rotation'], action='store_true')
   parser.add_argument('--wmpdmc_no_mkv', '-w', help=LSTRINGS['parser_mkv'], action='store_true')
   parser.add_argument('--trust_controler', '-t', help=LSTRINGS['parser_trust'], action='store_true')
   parser.add_argument('--search_subtitles', '-s', help=LSTRINGS['parser_subtitles'], action='store_true')
@@ -3188,7 +3136,7 @@ if __name__ == '__main__':
     NAME = args.name
     UDN = 'uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, args.name))
     DLNARenderer.Device_SCPD = DLNARenderer.Device_SCPD.replace('DLNAmpvRenderer', html.escape(NAME)).replace('uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, 'DLNAmpvRenderer')), UDN)
-  Renderer = DLNARenderer(args.bind, args.port, args.minimize, args.fullscreen, args.rotate_jpeg, args.wmpdmc_no_mkv, args.trust_controler, args.search_subtitles, args.gapless, args.verbosity)
+  Renderer = DLNARenderer(args.bind, args.port, args.minimize, args.fullscreen, args.wmpdmc_no_mkv, args.trust_controler, args.search_subtitles, args.gapless, args.verbosity)
   print(LSTRINGS['keyboard_s'])
   print(LSTRINGS['keyboard_m'] % (LSTRINGS['enabled'] if Renderer.Minimize else LSTRINGS['disabled']))
   print(LSTRINGS['keyboard_f'] % (LSTRINGS['enabled'] if Renderer.FullScreen else LSTRINGS['disabled']))
