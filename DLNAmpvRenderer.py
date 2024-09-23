@@ -1,4 +1,4 @@
-# DLNAmpvRenderer v1.3.1 (https://github.com/PCigales/DLNAmpvRenderer)
+# DLNAmpvRenderer v1.3.2 (https://github.com/PCigales/DLNAmpvRenderer)
 # Copyright © 2022 PCigales
 # This program is licensed under the GNU GPLv3 copyleft license (see https://www.gnu.org/licenses)
 
@@ -31,7 +31,7 @@ UDN = 'uuid:' + str(uuid.uuid5(uuid.NAMESPACE_URL, 'DLNAmpvRenderer'))
 
 FR_STRINGS = {
   'license': 'Ce programme est sous licence copyleft GNU GPLv3 (voir https://www.gnu.org/licenses)',
-  'help': 'affichage du message d\'aide et interruption du script', 
+  'help': 'affichage du message d\'aide et interruption du script',
   'parser_ip': 'adresse IP du renderer [auto-sélectionnée par défaut - "0.0.0.0", soit toutes les interfaces, si option présente sans mention d\'adresse]',
   'parser_port': 'port TCP du renderer [8000 par défaut]',
   'parser_name': 'nom du renderer [DLNAmpvRenderer par défaut]',
@@ -3119,7 +3119,7 @@ class DLNARenderer:
 
 if __name__ == '__main__':
 
-  print('DLNAmpvRenderer v1.3.1 (https://github.com/PCigales/DLNAmpvRenderer)    Copyright © 2022 PCigales')
+  print('DLNAmpvRenderer v1.3.2 (https://github.com/PCigales/DLNAmpvRenderer)    Copyright © 2022 PCigales')
   print(LSTRINGS['license'])
   print('')
 
