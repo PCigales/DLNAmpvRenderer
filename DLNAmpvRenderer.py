@@ -556,7 +556,7 @@ class IPCmpvControler(threading.Thread):
     self.Pipe_buffer = ctypes.create_string_buffer(10000)
     self.Cmd_Event = HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR(urllib.parse.quote(self.title_name, safe='') + '_input')))
     self.Msg_event = threading.Event()
-    self.Cmd_buffer = ["run", ('set_property', 'script-opts', 'osc-visibility=never'), ('observe_property', 1, 'time-pos'), ('observe_property', 2, 'pause'), ('observe_property', 3, 'duration'), ('observe_property', 4, 'mute'), ('observe_property', 5, 'volume'), ('observe_property', 6, 'playlist-playing-pos'), ('observe_property', 7, 'idle-active'), ('set_property', 'title', '${?media-title:${media-title}}${!media-title:No file} - %s' % title_name)]
+    self.Cmd_buffer = ["run", ('get_property', 'command-list'), ('set_property', 'script-opts', 'osc-visibility=never'), ('observe_property', 1, 'time-pos'), ('observe_property', 2, 'pause'), ('observe_property', 3, 'duration'), ('observe_property', 4, 'mute'), ('observe_property', 5, 'volume'), ('observe_property', 6, 'playlist-playing-pos'), ('observe_property', 7, 'idle-active'), ('set_property', 'title', '${?media-title:${media-title}}${!media-title:No file} - %s' % title_name)]
     self.Msg_buffer = ['run']
     self.Read_pending = False
     kernel32.ResetEvent(self.lpOverlapped_r.contents.hEvent)
@@ -564,6 +564,7 @@ class IPCmpvControler(threading.Thread):
     kernel32.ResetEvent(self.lpOverlapped_w.contents.hEvent)
     kernel32.ResetEvent(self.Cmd_Event)
     self.Player_events = []
+    self.Player_loadfile_options_pos = 3
     self.Player_status = "NO_MEDIA_PRESENT"
     self.Player_time_pos = ""
     self.Player_duration = ""
@@ -585,7 +586,8 @@ class IPCmpvControler(threading.Thread):
         except:
           continue
         if 'event' in msg_dict:
-          if msg_dict['event'] == "property-change":
+          ev = msg_dict['event']
+          if ev == "property-change":
             name = msg_dict.get('name', '')
             if name == "duration":
               if 'data' in msg_dict:
@@ -649,24 +651,24 @@ class IPCmpvControler(threading.Thread):
                 self.Player_events.append(('Playlist', "1"))
                 self.Player_event_event.set()
                 self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('Playlist', "1"), 1)
-          elif msg_dict['event'] == "start-file":
+          elif ev == "start-file":
             self.Player_time_pos = ""
             self.Player_duration = ""
             self.Player_status = "TRANSITIONING"
             self.Player_events.append(('TransportState', "STARTING"))
             self.Player_event_event.set()
             self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportState', "TRANSITIONING"), 2)
-          elif msg_dict['event'] == "end-file":
+          elif ev == "end-file":
             if msg_dict.get('reason','').lower() == "error":
               self.Player_events.append(('TransportStatus', "ERROR_OCCURRED"))
               self.Player_event_event.set()
               self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportStatus', "ERROR_OCCURRED"), 2)
-          elif msg_dict['event'] == 'seek':
+          elif ev == 'seek':
             self.Player_status = "TRANSITIONING"
             self.Player_events.append(('TransportState', "TRANSITIONING"))
             self.Player_event_event.set()
             self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportState', "TRANSITIONING"), 2)
-          elif msg_dict['event'] == "playback-restart":
+          elif ev == "playback-restart":
             if self.Player_paused:
               self.Player_status = "PAUSED_PLAYBACK"
               self.Player_events.append(('TransportState', "PAUSED_PLAYBACK"))
@@ -677,6 +679,11 @@ class IPCmpvControler(threading.Thread):
               self.Player_events.append(('TransportState', "PLAYING"))
               self.Player_event_event.set()
               self.logger.log('Lecteur - événement enregistré: %s = "%s"' % ('TransportState', "PLAYING"), 1)
+        elif msg_dict.get('request_id') == 0:
+          try:
+            self.Player_loadfile_options_pos = next(i for i, a in enumerate(next(c['args'] for c in msg_dict['data'] if c['name'] == 'loadfile')) if a['name'] == 'options')
+          except:
+            pass
       if self.Msg_buffer[0] == "run":
         self.Msg_event.wait()
 
@@ -2993,18 +3000,18 @@ class DLNARenderer:
           self.events_add('AVTransport', (('CurrentMediaDuration', "0:00:00"), ('CurrentTrackDuration', "0:00:00")))
           self.IPCmpvControlerInstance.Player_event_event.set()
         else:
-          self.send_command(('loadfile', self.AVTransportURI, 'replace', self.LoadfileOptions))
+          self.send_command(('loadfile', self.AVTransportURI, 'replace', 0, self.LoadfileOptions) if self.IPCmpvControlerInstance.Player_loadfile_options_pos == 3 else ('loadfile', self.AVTransportURI, 'replace', self.LoadfileOptions))
           self.send_command(('set_property', 'pause', False))
         self.logger.log(LSTRINGS['current_content'] % (LSTRINGS['video'] if 'video' in upnp_class.lower() else LSTRINGS['audio'] if 'audio' in upnp_class.lower() else LSTRINGS['image'] if 'image' in upnp_class.lower() else '', title, self.AVTransportURI + ((' + ' + sub_uri) if sub_uri else '')), 0)
       else:
         self.NextLoadfileOptions = load_opt
-        self.send_command(('loadfile', self.NextAVTransportURI, 'append', self.NextLoadfileOptions))
+        self.send_command(('loadfile', self.NextAVTransportURI, 'append', 0, self.NextLoadfileOptions) if self.IPCmpvControlerInstance.Player_loadfile_options_pos == 3 else ('loadfile', self.NextAVTransportURI, 'append', self.NextLoadfileOptions))
         self.logger.log(LSTRINGS['next_content'] % ('vidéo' if 'video' in upnp_class.lower() else 'audio' if 'audio' in upnp_class.lower() else 'image' if 'image' in upnp_class.lower() else '', title, self.NextAVTransportURI + ((' + ' + sub_uri) if sub_uri else '')), 0)
     elif acti.lower() == 'Play'.lower():
       if self.TransportState == "NO_MEDIA_PRESENT":
         return '701', None
       if self.IPCmpvControlerInstance.Player_status.upper() in ("STOPPED", "NO_MEDIA_PRESENT"):
-        self.send_command(('loadfile', self.AVTransportURI, 'replace', self.LoadfileOptions))
+        self.send_command(('loadfile', self.AVTransportURI, 'replace', 0, self.LoadfileOptions) if self.IPCmpvControlerInstance.Player_loadfile_options_pos == 3 else ('loadfile', self.AVTransportURI, 'replace', self.LoadfileOptions))
         self.send_command(('set_property', 'script-opts', 'osc-visibility=auto'))
         if self.Minimize:
           self.send_command(('set_property', 'window-minimized', False))
