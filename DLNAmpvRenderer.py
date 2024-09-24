@@ -550,7 +550,6 @@ class IPCmpvControler(threading.Thread):
     self.NumberOfBytesTransferred_r = DWORD()
     self.NumberOfBytesTransferred_w = DWORD()
     self.Pipe_handle = None
-    self.Pipe_buffer = ctypes.create_string_buffer(10000)
     self.Cmd_Event = HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR(urllib.parse.quote(self.title_name, safe='') + '_input')))
     self.Msg_event = threading.Event()
     self.Cmd_buffer = ["run", ('get_property', 'command-list'), ('set_property', 'script-opts', 'osc-visibility=never'), ('observe_property', 1, 'time-pos'), ('observe_property', 2, 'pause'), ('observe_property', 3, 'duration'), ('observe_property', 4, 'mute'), ('observe_property', 5, 'volume'), ('observe_property', 6, 'playlist-playing-pos'), ('observe_property', 7, 'idle-active'), ('set_property', 'title', '${?media-title:${media-title}}${!media-title:No file} - %s' % title_name)]
@@ -720,6 +719,7 @@ class IPCmpvControler(threading.Thread):
     self.incoming_msg_thread = threading.Thread(target=self.manage_incoming_msg)
     self.incoming_msg_thread.start()
     w = 0
+    msg_buffer = ctypes.create_string_buffer(10001)
     msg_chunk = ""
     while self.Cmd_buffer[0] == "run":
       kernel32.ResetEvent(self.Cmd_Event)
@@ -738,8 +738,8 @@ class IPCmpvControler(threading.Thread):
         self.logger.log('Lecteur - message transmis: %s' % msg.value, 2)
         self.Write_pending = True
       if not self.Read_pending:
-        self.Pipe_buffer.raw = bytes(10000)
-        kernel32.ReadFileEx(self.Pipe_handle, self.Pipe_buffer, DWORD(10000), self.lpOverlapped_r, IPCmpvControler.ReadFileEx_Completion_Routine)
+        ctypes.memset(msg_buffer, 0, 10001)
+        kernel32.ReadFileEx(self.Pipe_handle, msg_buffer, DWORD(10000), self.lpOverlapped_r, IPCmpvControler.ReadFileEx_Completion_Routine)
         self.Read_pending = True
       w = kernel32.WaitForSingleObjectEx(self.Cmd_Event, DWORD(-1), BOOL(1))
       if w == 0x000000C0 or w == 0:
@@ -755,10 +755,12 @@ class IPCmpvControler(threading.Thread):
           self.Read_pending = False
           self.logger.log('Lecteur - lu depuis le tuyau: %d octets' % self.NumberOfBytesTransferred_r.value, 2)
       if not self.Read_pending:
-        if self.NumberOfBytesTransferred_r.value != 0:
-          msg_list = (msg_chunk + (self.Pipe_buffer.raw[0:self.NumberOfBytesTransferred_r.value] + b"\x00").decode('UTF-8')).splitlines()
-          self.Msg_buffer.extend(msg_list[0:-1])
-          msg_chunk = msg_list[-1][0:-1]
+        l = self.NumberOfBytesTransferred_r.value
+        if l != 0:
+          msg_buffer[l] = b"\x00"
+          msg_list = (msg_chunk + msg_buffer[:l+1].decode('UTF-8')).splitlines()
+          self.Msg_buffer.extend(msg_list[:-1])
+          msg_chunk = msg_list[-1][:-1]
           self.Msg_event.set()
     self.Msg_buffer[0] = "quit"
     self.Msg_event.set()
