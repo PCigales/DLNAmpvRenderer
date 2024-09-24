@@ -2848,7 +2848,7 @@ class DLNARenderer:
         return '402', None
     out_args = dict((arg.Name, arg.DefaultValue) for arg in action.Arguments if arg.Direction.lower() == 'out')
     with self.ActionsCondition:
-      while self.IPCmpvControlerInstance.Player_loadfile_options_pos is None and action_id > self.ActionsProcessed and self.is_request_manager_running:
+      while (self.IPCmpvControlerInstance.Player_loadfile_options_pos is None or action_id > self.ActionsProcessed) and self.is_request_manager_running:
         self.ActionsCondition.wait()
     if not self.is_request_manager_running:
       return '701', None
