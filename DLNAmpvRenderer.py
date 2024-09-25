@@ -685,6 +685,7 @@ class IPCmpvControler(threading.Thread):
           self.Player_event_event.set()
       if self.Msg_buffer[0] == "run":
         self.Msg_event.wait()
+        self.Msg_event.clear()
 
   def run_mpv(self):
     self.logger.log('Lecteur - lancement', 1)
@@ -719,7 +720,7 @@ class IPCmpvControler(threading.Thread):
     self.incoming_msg_thread = threading.Thread(target=self.manage_incoming_msg)
     self.incoming_msg_thread.start()
     w = 0
-    msg_buffer = ctypes.create_string_buffer(10001)
+    msg_buffer = ctypes.create_string_buffer(15001)
     msg_chunk = ""
     while self.Cmd_buffer[0] == "run":
       kernel32.ResetEvent(self.Cmd_Event)
@@ -738,8 +739,8 @@ class IPCmpvControler(threading.Thread):
         self.logger.log('Lecteur - message transmis: %s' % msg.value, 2)
         self.Write_pending = True
       if not self.Read_pending:
-        ctypes.memset(msg_buffer, 0, 10001)
-        kernel32.ReadFileEx(self.Pipe_handle, msg_buffer, DWORD(10000), self.lpOverlapped_r, IPCmpvControler.ReadFileEx_Completion_Routine)
+        ctypes.memset(msg_buffer, 0, 15001)
+        kernel32.ReadFileEx(self.Pipe_handle, msg_buffer, DWORD(15000), self.lpOverlapped_r, IPCmpvControler.ReadFileEx_Completion_Routine)
         self.Read_pending = True
       w = kernel32.WaitForSingleObjectEx(self.Cmd_Event, DWORD(-1), BOOL(1))
       if w == 0x000000C0 or w == 0:
@@ -758,7 +759,7 @@ class IPCmpvControler(threading.Thread):
         l = self.NumberOfBytesTransferred_r.value
         if l != 0:
           msg_buffer[l] = b"\x00"
-          msg_list = (msg_chunk + msg_buffer[:l+1].decode('UTF-8')).splitlines()
+          msg_list = ((msg_chunk + msg_buffer[:l+1].decode('UTF-8')) if msg_chunk else msg_buffer[:l+1].decode('UTF-8')).splitlines()
           self.Msg_buffer.extend(msg_list[:-1])
           msg_chunk = msg_list[-1][:-1]
           self.Msg_event.set()
