@@ -502,8 +502,9 @@ class HTTPRequest():
 
 
 ULONG = ctypes.wintypes.ULONG
-ULONG_PTR = ctypes.wintypes.ULARGE_INTEGER
+ULONG_PTR = ctypes.wintypes.WPARAM
 DWORD = ctypes.wintypes.DWORD
+LPDWORD = ctypes.wintypes.LPDWORD
 USHORT = ctypes.wintypes.USHORT
 BOOL = ctypes.wintypes.BOOL
 PVOID = ctypes.wintypes.LPVOID
@@ -513,6 +514,26 @@ pointer = ctypes.pointer
 LPWSTR = ctypes.wintypes.LPWSTR
 WINFUNCTYPE = ctypes.WINFUNCTYPE
 kernel32 = ctypes.WinDLL('kernel32',  use_last_error=True)
+kernel32.CreateEventW.restype = HANDLE
+kernel32.CreateEventW.argtypes = (PVOID, BOOL, BOOL, LPWSTR)
+kernel32.SetEvent.restype = BOOL
+kernel32.SetEvent.argtypes = (HANDLE,)
+kernel32.ResetEvent.restype = BOOL
+kernel32.ResetEvent.argtypes = (HANDLE,)
+kernel32.CreateFileW.restype = HANDLE
+kernel32.CreateFileW.argtypes = (LPWSTR, DWORD, DWORD, PVOID, DWORD, DWORD, HANDLE)
+kernel32.WriteFileEx.restype = BOOL
+kernel32.WriteFileEx.argtypes = (HANDLE, PVOID, DWORD, PVOID, PVOID)
+kernel32.ReadFileEx.restype = BOOL
+kernel32.ReadFileEx.argtypes = (HANDLE, PVOID, DWORD, PVOID, PVOID)
+kernel32.WaitForSingleObjectEx.restype = DWORD
+kernel32.WaitForSingleObjectEx.argtypes = (HANDLE, DWORD, BOOL)
+kernel32.GetOverlappedResultEx.restype = BOOL
+kernel32.GetOverlappedResultEx.argtypes = (HANDLE, PVOID, LPDWORD, DWORD, BOOL)
+kernel32.CancelIoEx.restype = BOOL
+kernel32.CancelIoEx.argtypes = (HANDLE, PVOID)
+kernel32.CloseHandle.restype = BOOL
+kernel32.CloseHandle.argtypes = (HANDLE,)
 
 class OVERLAPPED_STRUCT(ctypes.Structure):
   _fields_ = [('Offset', DWORD),('OffsetHigh', DWORD)]
@@ -532,25 +553,25 @@ class IPCmpvControler(threading.Thread):
 
   SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
 
+  @staticmethod
   def _Py_Completion_Routine(dwErrorCode, dwNumberOfBytesTransfered, lpOverlapped):
     kernel32.SetEvent(lpOverlapped.contents.hEvent)
-
-  ReadFileEx_Completion_Routine = LPOVERLAPPED_COMPLETION_ROUTINE(_Py_Completion_Routine)
-  WriteFileEx_Completion_Routine = LPOVERLAPPED_COMPLETION_ROUTINE(_Py_Completion_Routine)
 
   def __init__(self, title_name='mpv', verbosity=0):
     self.verbosity = verbosity
     self.logger = log_event(verbosity)
     self.title_name = title_name
     threading.Thread.__init__(self)
+    self.ReadFileEx_Completion_Routine = LPOVERLAPPED_COMPLETION_ROUTINE(self._Py_Completion_Routine)
+    self.WriteFileEx_Completion_Routine = LPOVERLAPPED_COMPLETION_ROUTINE(self._Py_Completion_Routine)
     self.lpOverlapped_r = pointer(OVERLAPPED())
     self.lpOverlapped_w = pointer(OVERLAPPED())
-    self.lpOverlapped_r.contents.hEvent=HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR(urllib.parse.quote(self.title_name, safe='') + '_read')))
-    self.lpOverlapped_w.contents.hEvent=HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR(urllib.parse.quote(self.title_name, safe='') + '_write')))
+    self.lpOverlapped_r.contents.hEvent = kernel32.CreateEventW(None, True, False, urllib.parse.quote(self.title_name, safe='') + '_read')
+    self.lpOverlapped_w.contents.hEvent = kernel32.CreateEventW(None, True, False, urllib.parse.quote(self.title_name, safe='') + '_write')
     self.NumberOfBytesTransferred_r = DWORD()
     self.NumberOfBytesTransferred_w = DWORD()
     self.Pipe_handle = None
-    self.Cmd_Event = HANDLE(kernel32.CreateEventW(PVOID(0), BOOL(1), BOOL(0), LPWSTR(urllib.parse.quote(self.title_name, safe='') + '_input')))
+    self.Cmd_Event = kernel32.CreateEventW(None, True, False, urllib.parse.quote(self.title_name, safe='') + '_input')
     self.Msg_event = threading.Event()
     self.Cmd_buffer = ["run", ('get_property', 'command-list'), ('set_property', 'script-opts', 'osc-visibility=never'), ('observe_property', 1, 'time-pos'), ('observe_property', 2, 'pause'), ('observe_property', 3, 'duration'), ('observe_property', 4, 'mute'), ('observe_property', 5, 'volume'), ('observe_property', 6, 'playlist-playing-pos'), ('observe_property', 7, 'idle-active'), ('set_property', 'title', '${?media-title:${media-title}}${!media-title:No file} - %s' % title_name)]
     self.Msg_buffer = ['run']
@@ -708,7 +729,7 @@ class IPCmpvControler(threading.Thread):
     self.mpv_thread.start()
     request_id = 0
     while self.Cmd_buffer[0] != "quit":
-      hnd = HANDLE(kernel32.CreateFileW(LPWSTR(r'\\.\pipe\mpv_%s' % urllib.parse.quote(self.title_name, safe='')), DWORD(0xc0000000), DWORD(0), PVOID(0), DWORD(4), DWORD(0x60000000), HANDLE(0)))
+      hnd = kernel32.CreateFileW(r'\\.\pipe\mpv_%s' % urllib.parse.quote(self.title_name, safe=''), 0xc0000000, 0, None, 4, 0x60000000, None)
       if kernel32.GetLastError() == 2:
         time.sleep(0.2)
       else:
@@ -735,23 +756,23 @@ class IPCmpvControler(threading.Thread):
         if not msg:
           continue
         request_id += 1
-        kernel32.WriteFileEx(self.Pipe_handle, msg, DWORD(len(msg)), self.lpOverlapped_w, IPCmpvControler.WriteFileEx_Completion_Routine)
+        kernel32.WriteFileEx(self.Pipe_handle, msg, len(msg), self.lpOverlapped_w, self.WriteFileEx_Completion_Routine)
         self.logger.log('Lecteur - message transmis: %s' % msg.value, 2)
         self.Write_pending = True
       if not self.Read_pending:
         ctypes.memset(msg_buffer, 0, 15001)
-        kernel32.ReadFileEx(self.Pipe_handle, msg_buffer, DWORD(15000), self.lpOverlapped_r, IPCmpvControler.ReadFileEx_Completion_Routine)
+        kernel32.ReadFileEx(self.Pipe_handle, msg_buffer, 15000, self.lpOverlapped_r, self.ReadFileEx_Completion_Routine)
         self.Read_pending = True
-      w = kernel32.WaitForSingleObjectEx(self.Cmd_Event, DWORD(-1), BOOL(1))
+      w = kernel32.WaitForSingleObjectEx(self.Cmd_Event, -1, True)
       if w == 0x000000C0 or w == 0:
         if self.Write_pending:
           self.NumberOfBytesTransferred_w.value = 0
-          if kernel32.GetOverlappedResultEx(self.Pipe_handle, self.lpOverlapped_w, ctypes.byref(self.NumberOfBytesTransferred_w), DWORD(1), BOOL(0)) != 0:
+          if kernel32.GetOverlappedResultEx(self.Pipe_handle, self.lpOverlapped_w, ctypes.byref(self.NumberOfBytesTransferred_w), 1, False) != 0:
             kernel32.ResetEvent(self.lpOverlapped_w.contents.hEvent)
             self.Write_pending = False
             self.logger.log('Lecteur - écrit dans le tuyau: %d octets' % self.NumberOfBytesTransferred_w.value, 2)
         self.NumberOfBytesTransferred_r.value = 0
-        if kernel32.GetOverlappedResultEx(self.Pipe_handle, self.lpOverlapped_r, ctypes.byref(self.NumberOfBytesTransferred_r), DWORD(1), BOOL(0)) != 0:
+        if kernel32.GetOverlappedResultEx(self.Pipe_handle, self.lpOverlapped_r, ctypes.byref(self.NumberOfBytesTransferred_r), 1, False) != 0:
           kernel32.ResetEvent(self.lpOverlapped_r.contents.hEvent)
           self.Read_pending = False
           self.logger.log('Lecteur - lu depuis le tuyau: %d octets' % self.NumberOfBytesTransferred_r.value, 2)
@@ -768,7 +789,7 @@ class IPCmpvControler(threading.Thread):
     msg = ctypes.create_string_buffer(json.dumps({'command': ['quit'], 'request_id': request_id}).encode('UTF-8'))
     msg[len(msg) - 1] = b'\n'
     kernel32.CancelIoEx(self.Pipe_handle, None)
-    kernel32.WriteFileEx(self.Pipe_handle, msg, DWORD(len(msg)), self.lpOverlapped_w, IPCmpvControler.WriteFileEx_Completion_Routine)
+    kernel32.WriteFileEx(self.Pipe_handle, msg, len(msg), self.lpOverlapped_w, self.WriteFileEx_Completion_Routine)
     self.logger.log('Lecteur - message transmis: %s' % msg.value, 1)
     kernel32.CloseHandle(self.Pipe_handle)
 
